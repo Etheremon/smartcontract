@@ -138,6 +138,7 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
 }
 
 contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
+    uint8 constant public STAT_COUNT = 6;
     uint8 constant public GEN0_NO = 24;
     
     struct MonsterClassAcc {
@@ -201,14 +202,21 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint32 _ = 0;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
      
-        uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, obj.monsterId);
-        if (baseSize == 0)
-            return 0;
-        
+    
         uint256 total = 0;
-        for(uint i=0; i < baseSize; i+=1) {
-            total += data.getElementInArrayType(ArrayType.STAT_BASE, obj.monsterId, i);
-            total += safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(obj.classId), i), getLevel(obj.exp));
+        uint i = 0;
+        uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, obj.monsterId);
+        if (baseSize == 0) {
+            // use base as the stat is not generated
+            for(i=0; i < STAT_COUNT; i+=1) {
+                total += data.getElementInArrayType(ArrayType.STAT_START, uint64(obj.classId), i);
+                total += safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(obj.classId), i), getLevel(obj.exp));
+            }
+        } else {
+            for(i=0; i < baseSize; i+=1) {
+                total += data.getElementInArrayType(ArrayType.STAT_BASE, obj.monsterId, i);
+                total += safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(obj.classId), i), getLevel(obj.exp));
+            }
         }
         
         return uint64(total/baseSize);

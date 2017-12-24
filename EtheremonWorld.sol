@@ -373,8 +373,8 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     }
     
     // helper
-    function getRandom(uint8 maxRan, uint8 index) constant public returns(uint8) {
-        uint256 genNum = uint256(block.blockhash(block.number-1));
+    function getRandom(uint8 maxRan, uint8 index, address priAddress) constant public returns(uint8) {
+        uint256 genNum = uint256(block.blockhash(block.number-1)) + uint256(priAddress);
         for (uint8 i = 0; i < index && i < 6; i ++) {
             genNum /= 256;
         }
@@ -476,10 +476,15 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         
         // add monster
         uint64 objId = data.addMonsterObj(_classId, msg.sender, _name);
-        // generate base stat
-        for (uint i=0; i < STAT_COUNT; i+= 1) {
-            uint8 value = getRandom(STAT_MAX, uint8(i)) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
-            data.addElementToArrayType(ArrayType.STAT_BASE, objId, value);
+        if (objId > 1) {
+            // generate base stat for the previous one
+            uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, objId-1);
+            if (baseSize == 0) {
+                for (uint i=0; i < STAT_COUNT; i+= 1) {
+                    uint8 value = getRandom(STAT_MAX, uint8(i), msg.sender) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
+                    data.addElementToArrayType(ArrayType.STAT_BASE, objId-1, value);
+                }
+            }
         }
         
         EventCatchMonster(msg.sender, objId);

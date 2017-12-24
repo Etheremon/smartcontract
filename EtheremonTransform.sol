@@ -156,7 +156,7 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
 
 interface EtheremonTransformProcessor {
     function ableToLay(uint64 _objId) constant public returns(bool);
-    function processRelease(uint64 _objId) constant public returns(bool);
+    function processRelease(uint64 _objId) public returns(bool);
     function getAdvanceLay(uint64 _objId) constant public returns(uint32);
     function getTransformClass(uint64 _objId) constant public returns(uint32);
     function fasterHatchFee(uint64 _objId, uint blockSize) constant public returns(uint256);
@@ -206,6 +206,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     address public dataContract;
     address public processorContract;
     
+    address private lastHatchingAddress;
     mapping(uint64 => MonsterEgg) public eggs; // eggId
     mapping(address => uint64) public hatchingEggs;
     mapping(uint64 => uint64[]) public eggList; // objId -> [eggId]
@@ -231,15 +232,31 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // helper
-    function getRandom(uint16 maxRan, uint8 index) constant public returns(uint8) {
-        uint256 genNum = uint256(block.blockhash(block.number-1));
+    function getRandom(uint16 maxRan, uint8 index, address priAddress) constant public returns(uint8) {
+        uint256 genNum = uint256(block.blockhash(block.number-1)) + uint256(priAddress);
         for (uint8 i = 0; i < index && i < 6; i ++) {
             genNum /= 256;
         }
         return uint8(genNum % maxRan);
     }
     
-     // admin & moderators
+    function addNewObj(address _trainer, uint32 _classId) private returns(uint64) {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        uint64 objId = data.addMonsterObj(_classId, _trainer, "..name me...");
+        if (objId > 1) {
+            // generate base stat for the previous one
+            uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, objId-1);
+            if (baseSize == 0) {
+                for (uint i=0; i < STAT_COUNT; i+= 1) {
+                    uint8 value = getRandom(STAT_MAX, uint8(i), _trainer) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
+                    data.addElementToArrayType(ArrayType.STAT_BASE, objId-1, value);
+                }
+            }
+        }
+        return objId;
+    }
+    
+    // admin & moderators
     function setContract(address _dataContract, address _processorContract) onlyModerators public {
         dataContract = _dataContract;
         processorContract = _processorContract;
@@ -292,7 +309,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             egg.eggId = totalEgg;
             egg.classId = obj.classId;
             egg.trainer = msg.sender;
-            egg.hatchBlock = block.number + hatchStartTime + getRandom(hatchMaxTime, 0);
+            egg.hatchBlock = block.number + hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress);
             egg.hatched = false;
             hatchingEggs[msg.sender] = totalEgg;
             
@@ -302,6 +319,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function hatchedEgg() requireDataContract requireTransformProcessor public {
+        // use as a seed for random
+        lastHatchingAddress = msg.sender;
+        
         uint64 eggId = hatchingEggs[msg.sender];
         // not hatching any egg
         if (eggId == 0)
@@ -317,13 +337,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         }
         
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        uint64 objId = data.addMonsterObj(egg.classId, msg.sender, "..name me..");
-        // generate base stat
-        for (uint i=0; i < STAT_COUNT; i+= 1) {
-            uint8 value = getRandom(STAT_MAX, uint8(i)) + data.getElementInArrayType(ArrayType.STAT_START, uint64(egg.classId), i);
-            data.addElementToArrayType(ArrayType.STAT_BASE, objId, value);
-        }
+        addNewObj(msg.sender, egg.classId);
+        
         hatchingEggs[msg.sender] = 0;
         egg.hatched = true;
 
@@ -382,7 +397,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             egg.objId = _objId;
             egg.classId = classLayId;
             egg.trainer = msg.sender;
-            egg.hatchBlock = block.number + hatchStartTime + getRandom(hatchMaxTime, 0);
+            egg.hatchBlock = block.number + hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress);
             hatchingEggs[msg.sender] = totalEgg;
             
             // increase count
@@ -431,12 +446,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         if (classTranformedId > 0 && classTranformedId != classId) {
             // generate a new one 
             // add monster
-            uint64 objId = data.addMonsterObj(classTranformedId, msg.sender, "..name me..");
-            // generate base stat
-            for (uint i=0; i < STAT_COUNT; i+= 1) {
-                uint8 value = getRandom(STAT_MAX, uint8(i)) + data.getElementInArrayType(ArrayType.STAT_START, uint64(classTranformedId), i);
-                data.addElementToArrayType(ArrayType.STAT_BASE, objId, value);
-            }
+            
+            addNewObj(msg.sender, classTranformedId);
             
             // remove old one
             data.removeMonsterIdMapping(msg.sender, _objId);
