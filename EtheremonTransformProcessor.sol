@@ -139,7 +139,7 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
 
 interface ProcessorInterface {
     function ableToLay(uint64 _objId) constant public returns(bool);
-    function processRelease(uint64 _objId) returns(bool);
+    function processRelease(uint64 _objId) public returns(bool);
     function getAdvanceLay(uint64 _objId) constant public returns(uint32);
     function getTransformClass(uint64 _objId) constant public returns(uint32);
     function fasterHatchFee(uint64 _objId, uint blockSize) constant public returns(uint256);
@@ -156,6 +156,9 @@ interface EtheremonWorld {
     function getGen0COnfig(uint32 _classId) constant public returns(uint32, uint256, uint32);
     function getTrainerEarn(address _trainer) constant public returns(uint256);
     function getReturnFromMonster(uint64 _objId) constant public returns(uint256 current, uint256 total);
+}
+
+interface EtheremonBattle {
     function getMonsterLevel(uint64 _objId) constant public returns(uint8);
 }
 
@@ -187,18 +190,42 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     address public worldContract;
     address public dataContract;
     address public transformContract;
+    address public battleContract;
     
-    function EtheremonTransformProcessor(address _dataContract, address _transformContract, address _worldContract) public {
+    // moderators
+    modifier requireDataContract {
+        require(dataContract != 0x0);
+        _;
+    }
+    
+    modifier requireTransformContract {
+        require(transformContract != 0x0);
+        _;
+    }
+    
+    modifier requireWorldContract {
+        require(worldContract != 0x0);
+        _;
+    }
+
+    modifier requireBattleContract {
+        require(battleContract != 0x0);
+        _;
+    }
+    
+    function EtheremonTransformProcessor(address _dataContract, address _transformContract, address _worldContract, address _battleContract) public {
         dataContract = _dataContract;
         transformContract = _transformContract;
         worldContract = _worldContract;
+        battleContract = _battleContract;
     }
     
      // admin & moderators
-    function setContract(address _dataContract, address _transformContract, address _worldContract) onlyModerators public {
+    function setContract(address _dataContract, address _transformContract, address _worldContract, address _battleContract) onlyModerators public {
         dataContract = _dataContract;
         transformContract = _transformContract;
         worldContract = _worldContract;
+        battleContract = _battleContract;
     }
     
     function setMinLevelToLay(uint8 _value) onlyModerators public {
@@ -263,10 +290,10 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
   
     function ableToLay(uint64 _objId) constant public returns(bool) {
         // in this update, only gen 0 has egg
-        EtheremonWorld world = EtheremonWorld(worldContract);
+        EtheremonBattle battle = EtheremonBattle(battleContract);
         EtheremonTransform transform = EtheremonTransform(transformContract);
         
-        if (world.getMonsterLevel(_objId) < minLevelToLay)
+        if (battle.getMonsterLevel(_objId) < minLevelToLay)
             return false;
         
         uint totalLayedEgg = transform.countTotalEgg(_objId);
