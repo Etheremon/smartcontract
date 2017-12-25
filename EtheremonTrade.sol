@@ -214,6 +214,8 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     event EventBuyItem(address indexed buyer, uint64 objId);
     event EventOfferBorrowingItem(address indexed lender, uint64 objId);
     event EventAccepBorrowItem(address indexed borrower, uint64 objId);
+    event EventGetBackItem(address indexed owner, uint64 objId);
+    event EventFreeTransferItem(address indexed sender, address indexed receiver, uint64 objId);
     
     // constructor
     function EtheremonTrade(address _dataContract) public {
@@ -528,9 +530,11 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         
         transferMonster(msg.sender, _objId);
         removeBorrowingItem(_objId);
+        EventGetBackItem(msg.sender, _objId);
     }
     
     function freeTransferItem(uint64 _objId, address _receiver) requireDataContract isActive external {
+        require(_receiver != address(0));
         // check ownership
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
@@ -546,6 +550,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         }
         
         transferMonster(_receiver, _objId);
+        EventFreeTransferItem(msg.sender, _receiver, _objId);
     }
     
     // read access

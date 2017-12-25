@@ -194,6 +194,12 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     mapping(uint64 => uint64[]) public eggList; // objId -> [eggId]
     mapping(uint64 => bool) public transformed; //objId -> transformed
     
+    // events
+    event EventLayEgg(address indexed trainer, uint64 objId, uint64 eggId);
+    event EventHatchEgg(address indexed trainer, uint64 eggId, uint64 objId);
+    event EventTransform(address indexed trainer, uint64 oldObjId, uint64 newObjId);
+    event EventRelease(address indexed trainer, uint64 objId);
+    
     // modifier
     
     modifier requireDataContract {
@@ -297,6 +303,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             
             // increase count
             eggList[_objId].push(totalEgg);
+            EventLayEgg(msg.sender, _objId, totalEgg);
         }
     }
     
@@ -319,11 +326,11 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         }
         
-        addNewObj(msg.sender, egg.classId);
+        uint64 objId = addNewObj(msg.sender, egg.classId);
         
         hatchingEggs[msg.sender] = 0;
         egg.hatched = true;
-
+        EventHatchEgg(msg.sender, eggId, objId);
     }
     
     function increaseHatchingProcess(uint64 _objId, uint blockSize) requireDataContract requireTransformProcessor external payable  {
@@ -388,6 +395,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             // deduct fee
             uint256 deductedAmount = totalBalance - fee;
             data.setExtraBalance(msg.sender, deductedAmount);
+            
+            EventLayEgg(msg.sender, _objId, totalEgg);
         }
     }
     
@@ -403,6 +412,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         if (processor.processRelease(_objId)) {
             data.removeMonsterIdMapping(msg.sender, _objId);
         }
+        EventRelease(msg.sender, _objId);
     }
     
     function transform(uint64 _objId) requireDataContract requireTransformProcessor external payable {
@@ -429,7 +439,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             // generate a new one 
             // add monster
             
-            addNewObj(msg.sender, classTranformedId);
+            uint64 newObjId = addNewObj(msg.sender, classTranformedId);
             
             // remove old one
             data.removeMonsterIdMapping(msg.sender, _objId);
@@ -437,6 +447,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             // deduct fee
             uint256 deductedAmount = totalBalance - fee;
             data.setExtraBalance(msg.sender, deductedAmount);
+            
+            EventTransform(msg.sender, _objId, newObjId);
         }
     }
     
