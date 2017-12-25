@@ -47,9 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        if (msg.sender != owner) {
-            require(moderators[msg.sender] == true);
-        }
+        require(moderators[msg.sender] == true);
         _;
     }
 
@@ -351,7 +349,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // public
-    function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract isActive public {
+    function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract isActive external {
         // not on selling
         if (sellingDict[_objId].index > 0 || _price == 0)
             revert();
@@ -378,7 +376,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventPlaceSellOrder(msg.sender, _objId);
     }
     
-    function removeSellOrder(uint64 _objId) requireDataContract isActive public {
+    function removeSellOrder(uint64 _objId) requireDataContract isActive external {
         if (sellingDict[_objId].index == 0)
             revert();
         
@@ -399,7 +397,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeSellingItem(_objId);
     }
     
-    function buyItem(uint64 _objId, uint256 _buyingPrice) requireDataContract isActive public payable returns(ResultCode) {
+    function buyItem(uint64 _objId, uint256 _buyingPrice) requireDataContract isActive external payable {
         // check item is valid to sell 
         uint256 requestPrice = sellingDict[_objId].price;
         if (sellingDict[_objId].index == 0 || requestPrice == 0 || requestPrice != _buyingPrice) {
@@ -433,7 +431,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventBuyItem(msg.sender, _objId);
     }
     
-    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract isActive public {
+    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract isActive external {
         // make sure it is not on sale 
         if (sellingDict[_objId].price > 0 || _price == 0)
             revert();
@@ -460,7 +458,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventOfferBorrowingItem(msg.sender, _objId);
     }
     
-    function removeBorrowingOfferItem(uint64 _objId) requireDataContract isActive public {
+    function removeBorrowingOfferItem(uint64 _objId) requireDataContract isActive external {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -473,7 +471,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeBorrowingItem(_objId);
     }
     
-    function borrowItem(uint64 _objId, uint256 _price) requireDataContract isActive public payable {
+    function borrowItem(uint64 _objId, uint256 _price) requireDataContract isActive external payable {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -516,7 +514,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         
     }
     
-    function getBackLendingItem(uint64 _objId) requireDataContract isActive public {
+    function getBackLendingItem(uint64 _objId) requireDataContract isActive external {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -532,7 +530,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeBorrowingItem(_objId);
     }
     
-    function freeTransferItem(uint64 _objId, address _receiver) requireDataContract isActive public {
+    function freeTransferItem(uint64 _objId, address _receiver) requireDataContract isActive external {
         // check ownership
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
@@ -552,27 +550,27 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // read access
     
-    function getTotalSellingItem() constant public returns(uint) {
+    function getTotalSellingItem() constant external returns(uint) {
         return sellingList.length;
     }
 
-    function getSellingItemId(uint _index) constant public returns(uint64) {
+    function getSellingItemId(uint _index) constant external returns(uint64) {
         return sellingList[_index];
     }
     
-    function getSellingItemPrice(uint64 _itemId) constant public returns(uint256) {
+    function getSellingItemPrice(uint64 _itemId) constant external returns(uint256) {
         return sellingDict[_itemId].price;
     }
 
-    function getTotalBorrowingItem() constant public returns(uint) {
+    function getTotalBorrowingItem() constant external returns(uint) {
         return borrowingList.length;
     }
 
-    function getBorrowingItemId(uint _index) constant public returns(uint64) {
+    function getBorrowingItemId(uint _index) constant external returns(uint64) {
         return borrowingList[_index];
     }
     
-    function getBorrowingInfoPrice(uint64 _itemId) constant public returns(uint index, address owner, address borrower, 
+    function getBorrowingInfoPrice(uint64 _itemId) constant external returns(uint index, address owner, address borrower, 
         uint256 price, bool lent, uint releaseBlock) {
         BorrowItem storage item = borrowingDict[_itemId];
         index = item.index;

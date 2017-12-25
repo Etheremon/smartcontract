@@ -47,9 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        if (msg.sender != owner) {
-            require(moderators[msg.sender] == true);
-        }
+        require(moderators[msg.sender] == true);
         _;
     }
 
@@ -241,17 +239,17 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // admin & moderators
-    function setContract(address _dataContract, address _processorContract) onlyModerators public {
+    function setContract(address _dataContract, address _processorContract) onlyModerators external {
         dataContract = _dataContract;
         processorContract = _processorContract;
     }
     
-    function updateHatchingRange(uint16 _start, uint16 _max) onlyModerators public {
+    function updateHatchingRange(uint16 _start, uint16 _max) onlyModerators external {
         hatchStartTime = _start;
         hatchMaxTime = _max;
     }
 
-    function withdrawEther(address _sendTo, uint _amount) onlyModerators public returns(ResultCode) {
+    function withdrawEther(address _sendTo, uint _amount) onlyModerators external {
         // no user money is kept in this contract, only trasaction fee
         if (_amount > this.balance) {
             revert();
@@ -270,7 +268,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         return (obj.classId, msg.sender);
     }
     
-    function layEgg(uint64 _objId) requireDataContract requireTransformProcessor public {
+    function layEgg(uint64 _objId) requireDataContract requireTransformProcessor external {
         // make sure no hatching egg at the same time
         if (hatchingEggs[msg.sender] > 0) {
             revert();
@@ -302,7 +300,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
     
-    function hatchedEgg() requireDataContract requireTransformProcessor public {
+    function hatchedEgg() requireDataContract requireTransformProcessor external {
         // use as a seed for random
         lastHatchingAddress = msg.sender;
         
@@ -328,7 +326,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
 
     }
     
-    function increaseHatchingProcess(uint64 _objId, uint blockSize) requireDataContract requireTransformProcessor public payable  {
+    function increaseHatchingProcess(uint64 _objId, uint blockSize) requireDataContract requireTransformProcessor external payable  {
         uint64 eggId = hatchingEggs[msg.sender];
         // not hatching any egg
         if (eggId == 0)
@@ -357,7 +355,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // gen a diffrent monster class egg
-    function layAdvanceEgg(uint64 _objId) requireDataContract requireTransformProcessor public payable {
+    function layAdvanceEgg(uint64 _objId) requireDataContract requireTransformProcessor external payable {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint32 classId;
         address owner;
@@ -393,7 +391,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
     
-    function release(uint64 _objId) requireDataContract requireTransformProcessor public payable {
+    function release(uint64 _objId) requireDataContract requireTransformProcessor external payable {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint32 classId = 0;
         address owner = address(0);
@@ -407,7 +405,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
     
-    function transform(uint64 _objId) requireDataContract requireTransformProcessor public payable {
+    function transform(uint64 _objId) requireDataContract requireTransformProcessor external payable {
         if (transformed[_objId] == true)
             revert();
         
@@ -443,15 +441,15 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // read
-    function countTotalEgg(uint64 _objId) constant public returns(uint) {
+    function countTotalEgg(uint64 _objId) constant external returns(uint) {
         return eggList[_objId].length;
     }
     
-    function getEggId(uint64 _objId, uint index) constant public returns(uint64) {
+    function getEggId(uint64 _objId, uint index) constant external returns(uint64) {
         return eggList[_objId][index];
     }
     
-    function getEggInfo(uint64 _eggId) constant public returns(uint64 objId, uint32 classId, address trainer, uint hatchBlock) {
+    function getEggInfo(uint64 _eggId) constant external returns(uint64 objId, uint32 classId, address trainer, uint hatchBlock) {
         MonsterEgg memory egg = eggs[_eggId];
         return (egg.objId, egg.classId, egg.trainer, egg.hatchBlock);
     }

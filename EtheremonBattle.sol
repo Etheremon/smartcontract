@@ -47,9 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        if (msg.sender != owner) {
-            require(moderators[msg.sender] == true);
-        }
+        require(moderators[msg.sender] == true);
         _;
     }
 
@@ -157,12 +155,12 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
      // admin & moderators
-    function setContract(address _dataContract, address _worldContract) onlyModerators public {
+    function setContract(address _dataContract, address _worldContract) onlyModerators external {
         dataContract = _dataContract;
         worldContract = _worldContract;
     }
     
-    function setMaxLevel(uint8 _maxLevel) onlyModerators public {
+    function setMaxLevel(uint8 _maxLevel) onlyModerators external {
         maxLevel = _maxLevel;
     }
     
@@ -178,7 +176,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return level;
     }
     
-    function getMonsterLevel(uint64 _objId) constant public returns(uint8) {
+    function getMonsterLevel(uint64 _objId) constant external returns(uint8) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         uint32 _ = 0;
@@ -187,7 +185,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return getLevel(obj.exp);
     }
     
-    function getMonsterCP(uint64 _objId) constant public returns(uint64) {
+    function getMonsterCP(uint64 _objId) constant external returns(uint64) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         uint32 _ = 0;

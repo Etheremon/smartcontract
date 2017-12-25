@@ -47,9 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        if (msg.sender != owner) {
-            require(moderators[msg.sender] == true);
-        }
+        require(moderators[msg.sender] == true);
         _;
     }
 
@@ -205,14 +203,14 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     }
     
      // admin & moderators
-    function setContract(address _dataContract, address _transformContract, address _worldContract, address _battleContract) onlyModerators public {
+    function setContract(address _dataContract, address _transformContract, address _worldContract, address _battleContract) onlyModerators external {
         dataContract = _dataContract;
         transformContract = _transformContract;
         worldContract = _worldContract;
         battleContract = _battleContract;
     }
     
-    function setMinLevelToLay(uint8 _value) onlyModerators public {
+    function setMinLevelToLay(uint8 _value) onlyModerators external {
         minLevelToLay = _value;
     }
     

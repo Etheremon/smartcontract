@@ -47,9 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        if (msg.sender != owner) {
-            require(moderators[msg.sender] == true);
-        }
+        require(moderators[msg.sender] == true);
         _;
     }
 
@@ -211,15 +209,15 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     }
     
      // admin & moderators
-    function setContract(address _dataContract) onlyModerators public {
+    function setContract(address _dataContract) onlyModerators external {
         dataContract = _dataContract;
     }
     
-    function setMaxDexSize(uint _value) onlyModerators public {
+    function setMaxDexSize(uint _value) onlyModerators external {
         maxDexSize = _value;
     }
     
-    function setOriginalPriceGen0() onlyModerators public {
+    function setOriginalPriceGen0() onlyModerators external {
         gen0Config[1] = Gen0Config(1, 0.3 ether, 0.003 ether, 374);
         gen0Config[2] = Gen0Config(2, 0.3 ether, 0.003 ether, 408);
         gen0Config[3] = Gen0Config(3, 0.3 ether, 0.003 ether, 373);
@@ -267,7 +265,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         return totalValidAmount;
     }
     
-    function withdrawEther(address _sendTo, uint _amount) requireDataContract onlyModerators public returns(ResultCode) {
+    function withdrawEther(address _sendTo, uint _amount) requireDataContract onlyModerators external returns(ResultCode) {
         if (_amount > this.balance) {
             EventWithdrawEther(_sendTo, ResultCode.ERROR_INVALID_AMOUNT, 0);
             return ResultCode.ERROR_INVALID_AMOUNT;
@@ -287,7 +285,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
 
     // convenient tool to add monster
     function addMonsterClassBasic(uint32 _classId, uint8 _type, uint256 _price, uint256 _returnPrice,
-        uint8 _ss1, uint8 _ss2, uint8 _ss3, uint8 _ss4, uint8 _ss5, uint8 _ss6) requireDataContract onlyModerators public {
+        uint8 _ss1, uint8 _ss2, uint8 _ss3, uint8 _ss4, uint8 _ss5, uint8 _ss6) requireDataContract onlyModerators external {
         
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterClassAcc memory class;
@@ -310,7 +308,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     }
     
     function addMonsterClassExtend(uint32 _classId, uint8 _type2, uint8 _type3, 
-        uint8 _st1, uint8 _st2, uint8 _st3, uint8 _st4, uint8 _st5, uint8 _st6 ) requireDataContract onlyModerators public {
+        uint8 _st1, uint8 _st2, uint8 _st3, uint8 _st4, uint8 _st5, uint8 _st6 ) requireDataContract onlyModerators external {
 
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         if (_classId == 0 || data.getSizeArrayType(ArrayType.STAT_STEP, uint64(_classId)) > 0)
@@ -332,7 +330,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         data.addElementToArrayType(ArrayType.STAT_STEP, uint64(_classId), _st6);
     }
     
-    function setCatchable(uint32 _classId, bool catchable) requireDataContract onlyModerators public {
+    function setCatchable(uint32 _classId, bool catchable) requireDataContract onlyModerators external {
         // can not edit gen 0 - can not catch forever
         Gen0Config storage gen0 = gen0Config[_classId];
         if (gen0.classId == _classId)
@@ -344,11 +342,11 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         data.setMonsterClass(class.classId, class.price, class.returnPrice, catchable);
     }
     
-    function setPriceIncreasingRatio(uint16 _ratio) onlyModerators public {
+    function setPriceIncreasingRatio(uint16 _ratio) onlyModerators external {
         priceIncreasingRatio = _ratio;
     }
     
-    function addClassProperty(uint32 _classId, PropertyType _type, uint32 value) onlyModerators public {
+    function addClassProperty(uint32 _classId, PropertyType _type, uint32 value) onlyModerators external {
         GenXProperty storage pro = genxProperty[_classId];
         pro.classId = _classId;
         if (_type == PropertyType.ANCESTOR) {
@@ -439,7 +437,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     
     // write access
     
-    function renameMonster(uint64 _objId, string name) requireDataContract isActive public {
+    function renameMonster(uint64 _objId, string name) requireDataContract isActive external {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
@@ -449,7 +447,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         data.setMonsterObj(_objId, name, obj.exp, obj.createIndex, obj.lastClaimIndex);
     }
     
-    function catchMonster(uint32 _classId, string _name) requireDataContract isActive public payable {
+    function catchMonster(uint32 _classId, string _name) requireDataContract isActive external payable {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterClassAcc memory class;
         (class.classId, class.price, class.returnPrice, class.total, class.catchable) = data.getMonsterClass(_classId);
@@ -565,7 +563,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         return returnFromMonster;
     }
     
-    function getTrainerBalance(address _trainer) constant public returns(uint256) {
+    function getTrainerBalance(address _trainer) constant external returns(uint256) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         
         uint256 userExtraBalance = data.getExtraBalance(_trainer);
@@ -574,7 +572,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         return (userExtraBalance + returnFromMonster);
     }
     
-    function getMonsterClassBasic(uint32 _classId) constant public returns(uint256, uint256, uint256, bool) {
+    function getMonsterClassBasic(uint32 _classId) constant external returns(uint256, uint256, uint256, bool) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterClassAcc memory class;
         (class.classId, class.price, class.returnPrice, class.total, class.catchable) = data.getMonsterClass(_classId);
