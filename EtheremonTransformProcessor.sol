@@ -178,22 +178,22 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     
     // moderators
     modifier requireDataContract {
-        require(dataContract != 0x0);
+        require(dataContract != address(0));
         _;
     }
     
     modifier requireTransformContract {
-        require(transformContract != 0x0);
+        require(transformContract != address(0));
         _;
     }
     
     modifier requireWorldContract {
-        require(worldContract != 0x0);
+        require(worldContract != address(0));
         _;
     }
 
     modifier requireBattleContract {
-        require(battleContract != 0x0);
+        require(battleContract != address(0));
         _;
     }
     

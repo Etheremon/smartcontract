@@ -199,12 +199,12 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     // modifier
     
     modifier requireDataContract {
-        require(dataContract != 0x0);
+        require(dataContract != address(0));
         _;
     }
     
     modifier requireTransformProcessor {
-        require(processorContract != 0x0);
+        require(processorContract != address(0));
         _;
     }
     
@@ -396,7 +396,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     function release(uint64 _objId) requireDataContract requireTransformProcessor public payable {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint32 classId = 0;
-        address owner = 0x0;
+        address owner = address(0);
         (classId, owner) = getObjClassId(_objId);
         if (classId == 0 || owner != msg.sender)
             revert();
@@ -413,7 +413,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint32 classId = 0;
-        address owner = 0x0;
+        address owner = address(0);
         (classId, owner) = getObjClassId(_objId);
         if (classId == 0 || owner != msg.sender)
             revert();
