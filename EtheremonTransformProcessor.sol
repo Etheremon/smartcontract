@@ -32,7 +32,9 @@ contract SafeMath {
 
 contract BasicAccessControl {
     address public owner;
-    address[] public moderators;
+    // address[] public moderators;
+    uint16 public totalModerators = 0;
+    mapping (address => bool) public moderators;
     bool public isMaintaining = false;
 
     function BasicAccessControl() public {
@@ -46,14 +48,7 @@ contract BasicAccessControl {
 
     modifier onlyModerators() {
         if (msg.sender != owner) {
-            bool found = false;
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == msg.sender) {
-                    found = true;
-                    break;
-                }
-            }
-            require(found);
+            require(moderators[msg.sender] == true);
         }
         _;
     }
@@ -71,27 +66,16 @@ contract BasicAccessControl {
 
 
     function AddModerator(address _newModerator) onlyOwner public {
-        if (_newModerator != address(0)) {
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == _newModerator) {
-                    return;
-                }
-            }
-            moderators.push(_newModerator);
+        if (moderators[_newModerator] == false) {
+            moderators[_newModerator] = true;
+            totalModerators += 1;
         }
     }
     
     function RemoveModerator(address _oldModerator) onlyOwner public {
-        uint foundIndex = 0;
-        for (; foundIndex < moderators.length; foundIndex++) {
-            if (moderators[foundIndex] == _oldModerator) {
-                break;
-            }
-        }
-        if (foundIndex < moderators.length) {
-            moderators[foundIndex] = moderators[moderators.length-1];
-            delete moderators[moderators.length-1];
-            moderators.length--;
+        if (moderators[_oldModerator] == true) {
+            moderators[_oldModerator] = false;
+            totalModerators -= 1;
         }
     }
 }

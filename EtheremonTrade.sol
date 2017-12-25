@@ -32,7 +32,9 @@ contract SafeMath {
 
 contract BasicAccessControl {
     address public owner;
-    address[] public moderators;
+    // address[] public moderators;
+    uint16 public totalModerators = 0;
+    mapping (address => bool) public moderators;
     bool public isMaintaining = false;
 
     function BasicAccessControl() public {
@@ -46,14 +48,7 @@ contract BasicAccessControl {
 
     modifier onlyModerators() {
         if (msg.sender != owner) {
-            bool found = false;
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == msg.sender) {
-                    found = true;
-                    break;
-                }
-            }
-            require(found);
+            require(moderators[msg.sender] == true);
         }
         _;
     }
@@ -71,32 +66,17 @@ contract BasicAccessControl {
 
 
     function AddModerator(address _newModerator) onlyOwner public {
-        if (_newModerator != address(0)) {
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == _newModerator) {
-                    return;
-                }
-            }
-            moderators.push(_newModerator);
+        if (moderators[_newModerator] == false) {
+            moderators[_newModerator] = true;
+            totalModerators += 1;
         }
     }
     
     function RemoveModerator(address _oldModerator) onlyOwner public {
-        uint foundIndex = 0;
-        for (; foundIndex < moderators.length; foundIndex++) {
-            if (moderators[foundIndex] == _oldModerator) {
-                break;
-            }
+        if (moderators[_oldModerator] == true) {
+            moderators[_oldModerator] = false;
+            totalModerators -= 1;
         }
-        if (foundIndex < moderators.length) {
-            moderators[foundIndex] = moderators[moderators.length-1];
-            delete moderators[moderators.length-1];
-            moderators.length--;
-        }
-    }
-
-    function updateMaintenance(bool _isMaintaining) onlyModerators public {
-        isMaintaining = _isMaintaining;
     }
 }
 
@@ -190,12 +170,17 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     struct BorrowItem {
-        uint64 objId;
+        uint index;
         address owner;
         address borrower;
         uint256 price;
         bool lent;
         uint releaseBlock;
+    }
+    
+    struct SellingItem {
+        uint index;
+        uint256 price;
     }
     
     // data contract
@@ -204,12 +189,13 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     mapping(uint32 => Gen0Config) public gen0Config;
     
     // for selling
-    mapping(uint64 => uint256) public sellingDict;
+    mapping(uint64 => SellingItem) public sellingDict;
+    uint32 public totalSellingItem;
     uint64[] public sellingList;
     
     // for borrowing
     mapping(uint64 => BorrowItem) public borrowingDict;
-    mapping(address => uint64[]) public onLendingByTrainer;
+    uint32 public totalBorrowingItem;
     uint64[] public borrowingList;
     
     // trading fee
@@ -287,70 +273,55 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // helper
     function removeSellingItem(uint64 _itemId) private {
-        sellingDict[_itemId] = 0;
-        // remove from the list;
-        uint foundIndex = 0;
-        for (; foundIndex < sellingList.length; foundIndex++) {
-            if (sellingList[foundIndex] == _itemId) {
-                break;
-            }
-        }
-        if (foundIndex < sellingList.length) {
-            sellingList[foundIndex] = sellingList[sellingList.length-1];
-            delete sellingList[sellingList.length-1];
-            sellingList.length--;
+        SellingItem storage item = sellingDict[_itemId];
+        if (item.index == 0)
+            return;
+        
+        if (item.index <= sellingList.length) {
+            // Move an existing element into the vacated key slot.
+            sellingDict[sellingList[sellingList.length-1]].index = item.index;
+            sellingList[item.index-1] = sellingList[sellingList.length-1];
+            sellingList.length -= 1;
+            delete sellingDict[_itemId];
         }
     }
     
     function addSellingItem(uint64 _itemId, uint256 _price) private {
-        sellingDict[_itemId] = _price;
-
-        for (uint i = 0; i < sellingList.length; i++) {
-            if (sellingList[i] == _itemId) {
-                return;
-            }
+        SellingItem storage item = sellingDict[_itemId];
+        item.price = _price;
+        
+        if (item.index == 0) {
+            item.index = ++sellingList.length;
+            sellingList[item.index - 1] = _itemId;
         }
-        sellingList.push(_itemId);
     }
 
     function removeBorrowingItem(uint64 _itemId) private {
         BorrowItem storage item = borrowingDict[_itemId];
-        item.objId = 0;
-        item.owner = 0x0;
-        item.borrower = 0x0;
-        item.price = 0;
-        item.lent = false;
-        item.releaseBlock = 0;
+        if (item.index == 0)
+            return;
         
-        // remove from the list;
-        uint foundIndex = 0;
-        for (; foundIndex < borrowingList.length; foundIndex++) {
-            if (borrowingList[foundIndex] == _itemId) {
-                break;
-            }
-        }
-        if (foundIndex < borrowingList.length) {
-            borrowingList[foundIndex] = borrowingList[borrowingList.length-1];
-            delete borrowingList[borrowingList.length-1];
-            borrowingList.length--;
+        if (item.index <= borrowingList.length) {
+            // Move an existing element into the vacated key slot.
+            borrowingDict[borrowingList[borrowingList.length-1]].index = item.index;
+            borrowingList[item.index-1] = borrowingList[borrowingList.length-1];
+            borrowingList.length -= 1;
+            delete borrowingDict[_itemId];
         }
     }
 
     function addBorrowingItem(address _owner, uint64 _itemId, uint256 _price, uint blockCount) private {
         BorrowItem storage item = borrowingDict[_itemId];
-        item.objId = _itemId;
         item.owner = _owner;
         item.borrower = 0x0;
         item.price = _price;
         item.lent = false;
         item.releaseBlock = blockCount;
         
-        for (uint i = 0; i < borrowingList.length; i++) {
-            if (borrowingList[i] == _itemId) {
-                return;
-            }
+        if (item.index == 0) {
+            item.index = ++borrowingList.length;
+            borrowingList[item.index - 1] = _itemId;
         }
-        borrowingList.push(_itemId);
     }
     
     function transferMonster(address _to, uint64 _objId) private {
@@ -380,14 +351,13 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // public
-    
     function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract isActive public {
         // not on selling
-        if (sellingDict[_objId] > 0)
+        if (sellingDict[_objId].index > 0 || _price == 0)
             revert();
         // not on borrowing
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.objId == _objId)
+        if (item.index > 0)
             revert();
         
         // check ownership
@@ -409,7 +379,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function removeSellOrder(uint64 _objId) requireDataContract isActive public {
-        if (sellingDict[_objId] == 0)
+        if (sellingDict[_objId].index == 0)
             revert();
         
         // check ownership
@@ -431,8 +401,8 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function buyItem(uint64 _objId, uint256 _buyingPrice) requireDataContract isActive public payable returns(ResultCode) {
         // check item is valid to sell 
-        uint256 requestPrice = sellingDict[_objId];
-        if (requestPrice == 0 || requestPrice != _buyingPrice) {
+        uint256 requestPrice = sellingDict[_objId].price;
+        if (sellingDict[_objId].index == 0 || requestPrice == 0 || requestPrice != _buyingPrice) {
             revert();
         }
         
@@ -465,11 +435,11 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract isActive public {
         // make sure it is not on sale 
-        if (sellingDict[_objId] > 0)
+        if (sellingDict[_objId].price > 0 || _price == 0)
             revert();
         // not on borrowing
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.objId == _objId)
+        if (item.index > 0)
             revert();
         
         // check ownership
@@ -492,7 +462,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function removeBorrowingOfferItem(uint64 _objId) requireDataContract isActive public {
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.objId != _objId)
+        if (item.index == 0)
             revert();
         
         if (item.owner != msg.sender)
@@ -505,7 +475,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function borrowItem(uint64 _objId, uint256 _price) requireDataContract isActive public payable {
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.objId != _objId)
+        if (item.index == 0)
             revert();
         if (item.lent == true)
             revert();
@@ -547,7 +517,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function getBackLendingItem(uint64 _objId) requireDataContract isActive public {
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.objId != _objId)
+        if (item.index == 0)
             revert();
         if (item.lent == false)
             revert();
@@ -590,7 +560,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function getSellingItemPrice(uint64 _itemId) constant public returns(uint256) {
-        return sellingList[_itemId];
+        return sellingDict[_itemId].price;
     }
 
     function getTotalBorrowingItem() constant public returns(uint) {
@@ -601,10 +571,10 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         return borrowingList[_index];
     }
     
-    function getBorrowingInfoPrice(uint64 _itemId) constant public returns(uint64 objId, address owner, address borrower, 
+    function getBorrowingInfoPrice(uint64 _itemId) constant public returns(uint index, address owner, address borrower, 
         uint256 price, bool lent, uint releaseBlock) {
         BorrowItem storage item = borrowingDict[_itemId];
-        objId = item.objId;
+        index = item.index;
         owner = item.owner;
         borrower = item.borrower;
         price = item.price;

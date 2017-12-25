@@ -32,7 +32,9 @@ contract SafeMath {
 
 contract BasicAccessControl {
     address public owner;
-    address[] public moderators;
+    // address[] public moderators;
+    uint16 public totalModerators = 0;
+    mapping (address => bool) public moderators;
     bool public isMaintaining = false;
 
     function BasicAccessControl() public {
@@ -46,19 +48,11 @@ contract BasicAccessControl {
 
     modifier onlyModerators() {
         if (msg.sender != owner) {
-            bool found = false;
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == msg.sender) {
-                    found = true;
-                    break;
-                }
-            }
-            require(found);
+            require(moderators[msg.sender] == true);
         }
         _;
     }
-    
-    // modifier
+
     modifier isActive {
         require(isMaintaining == true);
         _;
@@ -72,32 +66,17 @@ contract BasicAccessControl {
 
 
     function AddModerator(address _newModerator) onlyOwner public {
-        if (_newModerator != address(0)) {
-            for (uint index = 0; index < moderators.length; index++) {
-                if (moderators[index] == _newModerator) {
-                    return;
-                }
-            }
-            moderators.push(_newModerator);
+        if (moderators[_newModerator] == false) {
+            moderators[_newModerator] = true;
+            totalModerators += 1;
         }
     }
     
     function RemoveModerator(address _oldModerator) onlyOwner public {
-        uint foundIndex = 0;
-        for (; foundIndex < moderators.length; foundIndex++) {
-            if (moderators[foundIndex] == _oldModerator) {
-                break;
-            }
+        if (moderators[_oldModerator] == true) {
+            moderators[_oldModerator] = false;
+            totalModerators -= 1;
         }
-        if (foundIndex < moderators.length) {
-            moderators[foundIndex] = moderators[moderators.length-1];
-            delete moderators[moderators.length-1];
-            moderators.length--;
-        }
-    }
-
-    function updateMaintenance(bool _isMaintaining) onlyModerators public {
-        isMaintaining = _isMaintaining;
     }
 }
 
@@ -212,6 +191,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     uint256 public totalCashout = 0; // for admin
     uint256 public totalEarn = 0; // exclude gen 0
     uint16 public priceIncreasingRatio = 1000;
+    uint public maxDexSize = 500;
 
     // data contract
     address public dataContract;
@@ -234,7 +214,10 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     function setContract(address _dataContract) onlyModerators public {
         dataContract = _dataContract;
     }
-
+    
+    function setMaxDexSize(uint _value) onlyModerators public {
+        maxDexSize = _value;
+    }
     
     function setOriginalPriceGen0() onlyModerators public {
         gen0Config[1] = Gen0Config(1, 300000000000000000, 3000000000000000, 374);
@@ -262,13 +245,8 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         gen0Config[23] = Gen0Config(23, 500000000000000000, 2500000000000000, 302);
         gen0Config[24] = Gen0Config(24, 1000000000000000000, 5000000000000000, 195);
     }
-    
-    function withdrawEther(address _sendTo, uint _amount) requireDataContract onlyModerators public returns(ResultCode) {
-        if (_amount > this.balance) {
-            EventWithdrawEther(_sendTo, ResultCode.ERROR_INVALID_AMOUNT, 0);
-            return ResultCode.ERROR_INVALID_AMOUNT;
-        }
-        
+
+    function getEarningAmount() constant requireDataContract onlyModerators public returns(uint256) {
         // calculate value for gen0
         uint256 totalValidAmount = 0;
         for (uint32 classId=1; classId <= GEN0_NO; classId++) {
@@ -286,6 +264,16 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         // deduct amount of cashing out 
         totalValidAmount = safeSubtract(totalValidAmount, totalCashout);
         
+        return totalValidAmount;
+    }
+    
+    function withdrawEther(address _sendTo, uint _amount) requireDataContract onlyModerators public returns(ResultCode) {
+        if (_amount > this.balance) {
+            EventWithdrawEther(_sendTo, ResultCode.ERROR_INVALID_AMOUNT, 0);
+            return ResultCode.ERROR_INVALID_AMOUNT;
+        }
+        
+        uint256 totalValidAmount = getEarningAmount();
         if (_amount > totalValidAmount) {
             EventWithdrawEther(_sendTo, ResultCode.ERROR_INVALID_AMOUNT, 0);
             return ResultCode.ERROR_INVALID_AMOUNT;
@@ -302,6 +290,12 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         uint8 _ss1, uint8 _ss2, uint8 _ss3, uint8 _ss4, uint8 _ss5, uint8 _ss6) requireDataContract onlyModerators public {
         
         EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterClassAcc memory class;
+        (class.classId, class.price, class.returnPrice, class.total, class.catchable) = data.getMonsterClass(_classId);
+        // can add only one time
+        if (_classId == 0 || class.classId == _classId)
+            revert();
+
         data.setMonsterClass(_classId, _price, _returnPrice, true);
         data.addElementToArrayType(ArrayType.CLASS_TYPE, uint64(_classId), _type);
         
@@ -319,6 +313,9 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         uint8 _st1, uint8 _st2, uint8 _st3, uint8 _st4, uint8 _st5, uint8 _st6 ) requireDataContract onlyModerators public {
 
         EtheremonDataBase data = EtheremonDataBase(dataContract);
+        if (_classId == 0 || data.getSizeArrayType(ArrayType.STAT_STEP, uint64(_classId)) > 0)
+            revert();
+
         if (_type2 > 0) {
             data.addElementToArrayType(ArrayType.CLASS_TYPE, uint64(_classId), _type2);
         }
@@ -460,6 +457,10 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         if (class.classId == 0 || class.catchable == false) {
             revert();
         }
+        
+        // can not keep too much etheremon 
+        if (data.getMonsterDexSize(msg.sender) > maxDexSize)
+            revert();
         
         uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
         uint256 payPrice = class.price;
