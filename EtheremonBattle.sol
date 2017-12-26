@@ -149,7 +149,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     // global variable
     uint8 public maxLevel = 100;
     
-    function EtheremonTransformProcessor(address _dataContract, address _worldContract) public {
+    function EtheremonBattle(address _dataContract, address _worldContract) public {
         dataContract = _dataContract;
         worldContract = _worldContract;
     }

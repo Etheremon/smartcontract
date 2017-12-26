@@ -209,10 +209,6 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     }
     
      // admin & moderators
-    function setContract(address _dataContract) onlyModerators external {
-        dataContract = _dataContract;
-    }
-    
     function setMaxDexSize(uint _value) onlyModerators external {
         maxDexSize = _value;
     }
@@ -490,7 +486,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     }
 
 
-    function cashOut(uint256 _amount) requireDataContract isActive public returns(ResultCode) {
+    function cashOut(uint256 _amount) requireDataContract public returns(ResultCode) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         
         uint256 totalAmount = data.getExtraBalance(msg.sender);
@@ -509,7 +505,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
                         uint32 gap = uint32(safeSubtract(gen0.total, obj.lastClaimIndex));
                         if (gap > 0) {
                             totalAmount += safeMult(gap, gen0.returnPrice);
-                            // reset total (accept name is cleared :( )
+                            // reset total (except name is cleared :( )
                             data.setMonsterObj(obj.monsterId, " name me ", obj.exp, obj.createIndex, gen0.total);
                         }
                     }
