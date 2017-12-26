@@ -245,8 +245,12 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
             Gen0Config storage gen0 = gen0Config[classId];
             if (gen0.total >0 && gen0.classId == classId && gen0.originalPrice > 0 && gen0.returnPrice > 0) {
                 uint256 rate = gen0.originalPrice/gen0.returnPrice;
-                totalValidAmount += (gen0.originalPrice + gen0.returnPrice) * rate / 2;
-                totalValidAmount += (gen0.total - rate) * gen0.returnPrice;
+                if (rate < gen0.total) {
+                    totalValidAmount += (gen0.originalPrice + gen0.returnPrice) * rate / 2;
+                    totalValidAmount += (gen0.total - rate) * gen0.returnPrice;
+                } else {
+                    totalValidAmount += (gen0.originalPrice + gen0.returnPrice * (rate - gen0.total + 1)) / 2 * gen0.total;
+                }
             }
         }
         
@@ -552,7 +556,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         uint64 objId = 0;
         uint dexSize = data.getMonsterDexSize(_trainer);
         for (uint i = 0; i < dexSize; i++) {
-            objId = data.getMonsterObjId(msg.sender, i);
+            objId = data.getMonsterObjId(_trainer, i);
             if (objId > 0) {
                 (gen0current, gen0total) = getReturnFromMonster(objId);
                 returnFromMonster += gen0current;
