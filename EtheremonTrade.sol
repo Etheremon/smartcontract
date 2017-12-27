@@ -408,41 +408,27 @@ contract EtheremonTrade is EtheremonBattleInterface, EtheremonEnum, BasicAccessC
         removeSellingItem(_objId);
     }
     
-    function buyItem(uint64 _objId, uint256 _buyingPrice) requireDataContract isActive external payable {
+    function buyItem(uint64 _objId) requireDataContract isActive external payable {
         // check item is valid to sell 
         uint256 requestPrice = sellingDict[_objId].price;
-        if (sellingDict[_objId].index == 0 || requestPrice == 0 || requestPrice != _buyingPrice) {
+        if (requestPrice == 0 || msg.value != requestPrice) {
             revert();
         }
         
         // check obj
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         uint32 _ = 0;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
-        
         if (obj.monsterId != _objId) {
             revert();
         }
         
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        // check buyer has enough money
-        uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
-        if (totalBalance < requestPrice) {
-            revert();
-        }
-        
-        uint256 deductedAmount = totalBalance - requestPrice;
+        address oldTrainer = obj.trainer;
         uint256 fee = requestPrice / tradingFeeRatio;
-        data.setExtraBalance(msg.sender, deductedAmount);
+        removeSellingItem(_objId);
         transferMonster(msg.sender, _objId);
-        // possible fee will be stuck on etheremon world and no one can access it.
-        data.addExtraBalance(obj.trainer, safeSubtract(requestPrice, fee));
-        
-        // send money to etheremon world contract
-        if (msg.value > fee) {
-            worldContract.transfer(safeSubtract(msg.value, fee));
-        }
-        
+        oldTrainer.transfer(safeSubtract(requestPrice, fee));
         EventBuyItem(msg.sender, _objId);
     }
     
@@ -491,50 +477,34 @@ contract EtheremonTrade is EtheremonBattleInterface, EtheremonEnum, BasicAccessC
         removeBorrowingItem(_objId);
     }
     
-    function borrowItem(uint64 _objId, uint256 _price) requireDataContract isActive external payable {
+    function borrowItem(uint64 _objId) requireDataContract isActive external payable {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
         if (item.lent == true)
             revert();
         uint256 itemPrice = item.price;
-        if (itemPrice != _price)
+        if (itemPrice != msg.value)
             revert();
         
 
         // check obj
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         uint32 _ = 0;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
-        
         if (obj.monsterId != _objId) {
             revert();
         }
         
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        // check buyer has enough money
-        uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
-        if (totalBalance < item.price) {
-            revert();
-        }
-        
-        uint256 deductedAmount = totalBalance - itemPrice;
         uint256 fee = itemPrice/tradingFeeRatio;
-        data.setExtraBalance(msg.sender, deductedAmount);
         item.borrower = msg.sender;
         item.releaseBlock += block.number;
         item.lent = true;
+        address oldOwner = obj.trainer;
         transferMonster(msg.sender, _objId);
-        data.addExtraBalance(obj.trainer, safeSubtract(itemPrice, fee));
-        
-        // send to world contract 
-        // possible some fee will be stuck in etheremon world contract and no one can access it.
-        if (msg.value > fee) {
-            worldContract.transfer(safeSubtract(msg.value, fee));
-        }
-        
+        oldOwner.transfer(safeSubtract(itemPrice, fee));
         EventAcceptBorrowItem(msg.sender, _objId);
-        
     }
     
     function getBackLendingItem(uint64 _objId) requireDataContract isActive external {
@@ -549,8 +519,8 @@ contract EtheremonTrade is EtheremonBattleInterface, EtheremonEnum, BasicAccessC
         if (msg.sender != item.owner)
             revert();
         
-        transferMonster(msg.sender, _objId);
         removeBorrowingItem(_objId);
+        transferMonster(msg.sender, _objId);
         EventGetBackItem(msg.sender, _objId);
     }
     
