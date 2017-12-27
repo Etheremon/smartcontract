@@ -154,7 +154,8 @@ contract EtheremonGateway is EtheremonEnum {
 }
 
 contract EtheremonWorld is EtheremonGateway, BasicAccessControl, SafeMath {
-
+    // old processor
+    address constant public ETHEREMON_PROCESSOR = address(0x8a60806F05876f4d6dB00c877B0558DbCAD30682);
     uint8 constant public STAT_COUNT = 6;
     uint8 constant public STAT_MAX = 32;
     uint8 constant public GEN0_NO = 24;
@@ -387,8 +388,8 @@ contract EtheremonWorld is EtheremonGateway, BasicAccessControl, SafeMath {
     }
     
     function () payable public {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        data.addExtraBalance(msg.sender, msg.value);
+        if (msg.sender != ETHEREMON_PROCESSOR)
+            revert();
     }
     
     // public
