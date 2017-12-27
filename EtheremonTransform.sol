@@ -346,15 +346,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         
         EtheremonTransformProcessor processor = EtheremonTransformProcessor(processorContract);
         uint256 fee = processor.fasterHatchFee(_objId, blockSize);
-        // check buyer has enough money
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
-        if (totalBalance < fee) {
+        if (msg.value < fee) {
             revert();
         }
-        
-        uint256 deductedAmount = totalBalance - fee;
-        data.setExtraBalance(msg.sender, deductedAmount);
         if (egg.hatchBlock < blockSize)
             egg.hatchBlock = 0;
         else
@@ -363,7 +357,6 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // gen a diffrent monster class egg
     function layAdvanceEgg(uint64 _objId) requireDataContract requireTransformProcessor external payable {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint32 classId;
         address owner;
         (classId, owner) = getObjClassId(_objId);
@@ -372,9 +365,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             
         EtheremonTransformProcessor processor = EtheremonTransformProcessor(processorContract);
         uint256 fee = processor.getAdvanceLayFee(_objId);
-        // check buyer has enough money
-        uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
-        if (totalBalance < fee) {
+        if (msg.value < fee) {
             revert();
         }
         
@@ -391,12 +382,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             
             // increase count
             eggList[_objId].push(totalEgg);
-            
-            // deduct fee
-            uint256 deductedAmount = totalBalance - fee;
-            data.setExtraBalance(msg.sender, deductedAmount);
-            
             EventLayEgg(msg.sender, _objId, totalEgg);
+        } else {
+            revert();
         }
     }
     
@@ -428,9 +416,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
 
         EtheremonTransformProcessor processor = EtheremonTransformProcessor(processorContract);
         uint256 fee = processor.getTransformFee(_objId);
-        // check buyer has enough money
-        uint256 totalBalance = safeAdd(msg.value, data.getExtraBalance(msg.sender));
-        if (totalBalance < fee) {
+        if (msg.value < fee) {
             revert();
         }
 
@@ -443,11 +429,6 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             
             // remove old one
             data.removeMonsterIdMapping(msg.sender, _objId);
-            
-            // deduct fee
-            uint256 deductedAmount = totalBalance - fee;
-            data.setExtraBalance(msg.sender, deductedAmount);
-            
             EventTransform(msg.sender, _objId, newObjId);
         }
     }
