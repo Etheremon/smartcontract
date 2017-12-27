@@ -246,7 +246,7 @@ contract EtheremonWorld is EtheremonGateway, BasicAccessControl, SafeMath {
         gen0Config[24] = Gen0Config(24, 1 ether, 0.005 ether, 195);
     }
 
-    function getEarningAmount() constant onlyModerators public returns(uint256) {
+    function getEarningAmount() constant public returns(uint256) {
         // calculate value for gen0
         uint256 totalValidAmount = 0;
         for (uint32 classId=1; classId <= GEN0_NO; classId++) {
