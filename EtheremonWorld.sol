@@ -52,7 +52,7 @@ contract BasicAccessControl {
     }
 
     modifier isActive {
-        require(isMaintaining);
+        require(!isMaintaining);
         _;
     }
 
@@ -140,13 +140,20 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
     function getMonsterReturn(uint64 _objId) constant public returns(uint256 current, uint256 total);
 }
 
-contract EtheremonGateway {
+contract EtheremonGateway is EtheremonEnum {
     // using for battle contract later
     function increaseMonsterExp(uint64 _objId, uint32 amount) public;
     function decreaseMonsterExp(uint64 _objId, uint32 amount) public;
+    
+    // read 
+    function isGason(uint64 _objId) constant external returns(bool);
+    function getObjBattleInfo(uint64 _objId) constant external returns(uint32 classId, uint32 exp, bool isGason, 
+        uint ancestorLength, uint xfactorsLength);
+    function getClassPropertySize(uint32 _classId, PropertyType _type) constant external returns(uint);
+    function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant external returns(uint32);
 }
 
-contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, SafeMath {
+contract EtheremonWorld is EtheremonGateway, BasicAccessControl, SafeMath {
 
     uint8 constant public STAT_COUNT = 6;
     uint8 constant public STAT_MAX = 32;
@@ -181,6 +188,7 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     
     struct GenXProperty {
         uint32 classId;
+        bool isGason;
         uint32[] ancestors;
         uint32[] xfactors;
     }
@@ -343,6 +351,11 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         priceIncreasingRatio = _ratio;
     }
     
+    function setGason(uint32 _classId, bool _isGason) onlyModerators external {
+        GenXProperty storage pro = genxProperty[_classId];
+        pro.isGason = _isGason;
+    }
+    
     function addClassProperty(uint32 _classId, PropertyType _type, uint32 value) onlyModerators external {
         GenXProperty storage pro = genxProperty[_classId];
         pro.classId = _classId;
@@ -380,6 +393,14 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     
     // public
     
+    function isGason(uint64 _objId) constant external returns(bool) {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterObjAcc memory obj;
+        (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
+        GenXProperty storage pro = genxProperty[obj.classId];
+        return pro.isGason;
+    }
+    
     function getObjIndex(uint64 _objId) constant public returns(uint32 classId, uint32 createIndex, uint32 lastClaimIndex) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
@@ -387,14 +408,23 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         return (obj.classId, obj.createIndex, obj.lastClaimIndex);
     }
     
-    function getClassPropertySize(uint32 _classId, PropertyType _type) constant public returns(uint) {
+    function getObjBattleInfo(uint64 _objId) constant external returns(uint32 classId, uint32 exp, bool isGason, 
+        uint ancestorLength, uint xfactorsLength) {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterObjAcc memory obj;
+        (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
+        GenXProperty storage pro = genxProperty[obj.classId];
+        return (obj.classId, obj.exp, pro.isGason, pro.ancestors.length, pro.xfactors.length);
+    }
+    
+    function getClassPropertySize(uint32 _classId, PropertyType _type) constant external returns(uint) {
         if (_type == PropertyType.ANCESTOR) 
             return genxProperty[_classId].ancestors.length;
         else
             return genxProperty[_classId].xfactors.length;
     }
     
-    function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant public returns(uint32) {
+    function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant external returns(uint32) {
         if (_type == PropertyType.ANCESTOR)
             return genxProperty[_classId].ancestors[index];
         else

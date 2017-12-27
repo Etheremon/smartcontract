@@ -52,7 +52,7 @@ contract BasicAccessControl {
     }
 
     modifier isActive {
-        require(isMaintaining == true);
+        require(!isMaintaining);
         _;
     }
 
@@ -144,6 +144,10 @@ interface EtheremonBattle {
     function getMonsterLevel(uint64 _objId) constant public returns(uint8);
 }
 
+interface EtheremonTradeInterface {
+    function isOnTrading(uint64 _objId) constant external returns(bool);
+}
+
 contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 constant public GEN0_NO = 24;
     
@@ -173,6 +177,7 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     address public dataContract;
     address public transformContract;
     address public battleContract;
+    address public tradeContract;
     
     // moderators
     modifier requireDataContract {
@@ -195,19 +200,28 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
         _;
     }
     
-    function EtheremonTransformProcessor(address _dataContract, address _transformContract, address _worldContract, address _battleContract) public {
+    modifier requireTradeContract {
+        require(tradeContract != address(0));
+        _;
+    }
+    
+    function EtheremonTransformProcessor(address _dataContract, address _transformContract, address _worldContract, 
+        address _battleContract, address _tradeContract) public {
         dataContract = _dataContract;
         transformContract = _transformContract;
         worldContract = _worldContract;
         battleContract = _battleContract;
+        tradeContract = _tradeContract;
     }
     
      // admin & moderators
-    function setContract(address _dataContract, address _transformContract, address _worldContract, address _battleContract) onlyModerators external {
+    function setContract(address _dataContract, address _transformContract, address _worldContract, 
+        address _battleContract, address _tradeContract) onlyModerators external {
         dataContract = _dataContract;
         transformContract = _transformContract;
         worldContract = _worldContract;
         battleContract = _battleContract;
+        tradeContract = _tradeContract;
     }
     
     function setMinLevelToLay(uint8 _value) onlyModerators external {
@@ -285,6 +299,9 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     }
     
     function processRelease(uint64 _objId) public returns(bool) {
+        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
+        if (trade.isOnTrading(_objId))
+            return false;
         // can not release gen 0 
         uint32 classId;
         uint32 createIndex; 
@@ -301,7 +318,10 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
         return 0;
     }
     
-    function getTransformClass(uint64 _obj) constant public returns(uint32) {
+    function getTransformClass(uint64 _objId) constant public returns(uint32) {
+        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
+        if (trade.isOnTrading(_objId))
+            return 0;
         // not available in this update
         return 0;
     }

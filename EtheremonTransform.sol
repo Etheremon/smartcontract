@@ -52,7 +52,7 @@ contract BasicAccessControl {
     }
 
     modifier isActive {
-        require(isMaintaining == true);
+        require(!isMaintaining);
         _;
     }
 
