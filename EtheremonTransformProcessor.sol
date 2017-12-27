@@ -275,21 +275,27 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
             uint k = oTotal - rate;
             avgPrice = (oTotal * oPrice + class.returnPrice * k * (k+1) / 2) / oTotal;
         }
-        
-        
-        uint256 catchPrice = oPrice + class.returnPrice * safeSubtract(createIndex, 1);
-        if (totalEarn > catchPrice) {
+        uint256 catchPrice = oPrice;            
+        if (createIndex > rate) {
+            catchPrice += class.returnPrice * safeSubtract(createIndex, rate);
+        }
+        if (totalEarn >= catchPrice) {
             return 0;
         }
-        return ceil((catchPrice - totalEarn)*15, avgPrice)/10;
+        return ceil((catchPrice - totalEarn)*15*1000/avgPrice, 10000)/10000;
     }
   
     function ableToLay(uint64 _objId) constant public returns(bool) {
         // in this update, only gen 0 has egg
         EtheremonBattle battle = EtheremonBattle(battleContract);
         EtheremonTransform transform = EtheremonTransform(transformContract);
+        // can not release gen 0 
+        uint32 classId;
+        uint32 createIndex; 
+        uint256 totalEarn;
+        (classId, createIndex, totalEarn) = getObjInfo(_objId);
         
-        if (battle.getMonsterLevel(_objId) < minLevelToLay)
+        if (classId > GEN0_NO && battle.getMonsterLevel(_objId) < minLevelToLay)
             return false;
         
         uint totalLayedEgg = transform.countTotalEgg(_objId);
