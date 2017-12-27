@@ -262,11 +262,6 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         return totalValidAmount;
     }
     
-    function moveDataContractBalanceToWorld() onlyModerators external {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        data.withdrawEther(address(this), data.balance);
-    }
-    
     function withdrawEther(address _sendTo, uint _amount) onlyModerators external returns(ResultCode) {
         if (_amount > this.balance) {
             EventWithdrawEther(_sendTo, ResultCode.ERROR_INVALID_AMOUNT, 0);
@@ -439,6 +434,11 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
     
     // write access
     
+    function moveDataContractBalanceToWorld() external {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        data.withdrawEther(address(this), data.balance);
+    }
+    
     function renameMonster(uint64 _objId, string name) isActive external {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
@@ -528,8 +528,10 @@ contract EtheremonWorld is EtheremonGateway, EtheremonEnum, BasicAccessControl, 
         }
         
         // check contract has enough money
-        if (this.balance < _amount) {
+        if (this.balance + data.balance < _amount){
             revert();
+        } else if (this.balance < _amount) {
+            data.withdrawEther(address(this), data.balance);
         }
         
         if (_amount > 0) {
