@@ -136,7 +136,11 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
     function getMonsterReturn(uint64 _objId) constant public returns(uint256 current, uint256 total);
 }
 
-contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
+interface EtheremonBattleInterface {
+    function isOnBattle(uint64 _objId) constant external returns(bool) ;
+}
+
+contract EtheremonTrade is EtheremonBattleInterface, EtheremonEnum, BasicAccessControl, SafeMath {
     
     uint8 constant public GEN0_NO = 24;
 
@@ -184,6 +188,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     // data contract
     address public dataContract;
     address public worldContract;
+    address public battleContract;
     mapping(uint32 => Gen0Config) public gen0Config;
     
     // for selling
@@ -213,13 +218,15 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     event EventPlaceSellOrder(address indexed seller, uint64 objId);
     event EventBuyItem(address indexed buyer, uint64 objId);
     event EventOfferBorrowingItem(address indexed lender, uint64 objId);
-    event EventAccepBorrowItem(address indexed borrower, uint64 objId);
+    event EventAcceptBorrowItem(address indexed borrower, uint64 objId);
     event EventGetBackItem(address indexed owner, uint64 objId);
     event EventFreeTransferItem(address indexed sender, address indexed receiver, uint64 objId);
     
     // constructor
-    function EtheremonTrade(address _dataContract) public {
+    function EtheremonTrade(address _dataContract, address _worldContract, address _battleContract) public {
         dataContract = _dataContract;
+        worldContract = _worldContract;
+        battleContract = _battleContract;
     }
     
      // admin & moderators
@@ -250,16 +257,14 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         gen0Config[24] = Gen0Config(24, 1 ether, 0.005 ether, 195);
     }
     
-    function setContract(address _dataContract) onlyModerators public {
+    function setContract(address _dataContract, address _worldContract, address _battleContract) onlyModerators public {
         dataContract = _dataContract;
+        worldContract = _worldContract;
+        battleContract = _battleContract;
     }
     
     function updateTradingFee(uint16 _fee) onlyModerators public {
         tradingFeeRatio = _fee;
-    }
-    
-    function updateWorldContract(address _worldContract) onlyModerators public {
-        worldContract = _worldContract;
     }
     
     function withdrawEther(address _sendTo, uint _amount) onlyModerators public {
@@ -359,6 +364,10 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index > 0)
             revert();
+        // not on battle 
+        EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+        if (battle.isOnBattle(_objId))
+            revert();
         
         // check ownership
         EtheremonDataBase data = EtheremonDataBase(dataContract);
@@ -423,12 +432,16 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         }
         
         uint256 deductedAmount = totalBalance - requestPrice;
+        uint256 fee = requestPrice / tradingFeeRatio;
         data.setExtraBalance(msg.sender, deductedAmount);
         transferMonster(msg.sender, _objId);
-        data.addExtraBalance(obj.trainer, safeSubtract(requestPrice, requestPrice / tradingFeeRatio));
+        // possible fee will be stuck on etheremon world and no one can access it.
+        data.addExtraBalance(obj.trainer, safeSubtract(requestPrice, fee));
         
         // send money to etheremon world contract
-        worldContract.transfer(safeSubtract(requestPrice, requestPrice / tradingFeeRatio));
+        if (msg.value > fee) {
+            worldContract.transfer(safeSubtract(msg.value, fee));
+        }
         
         EventBuyItem(msg.sender, _objId);
     }
@@ -441,6 +454,11 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index > 0)
             revert();
+        // not on battle 
+        EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+        if (battle.isOnBattle(_objId))
+            revert();
+        
         
         // check ownership
         EtheremonDataBase data = EtheremonDataBase(dataContract);
@@ -501,18 +519,21 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         }
         
         uint256 deductedAmount = totalBalance - itemPrice;
-
+        uint256 fee = itemPrice/tradingFeeRatio;
         data.setExtraBalance(msg.sender, deductedAmount);
         item.borrower = msg.sender;
         item.releaseBlock += block.number;
         item.lent = true;
         transferMonster(msg.sender, _objId);
-        data.addExtraBalance(obj.trainer, safeSubtract(itemPrice, itemPrice/tradingFeeRatio));
+        data.addExtraBalance(obj.trainer, safeSubtract(itemPrice, fee));
         
         // send to world contract 
-        worldContract.transfer(safeSubtract(itemPrice, itemPrice/tradingFeeRatio));
+        // possible some fee will be stuck in etheremon world contract and no one can access it.
+        if (msg.value > fee) {
+            worldContract.transfer(safeSubtract(msg.value, fee));
+        }
         
-        EventBuyItem(msg.sender, _objId);
+        EventAcceptBorrowItem(msg.sender, _objId);
         
     }
     
@@ -534,7 +555,18 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function freeTransferItem(uint64 _objId, address _receiver) requireDataContract isActive external {
-        require(_receiver != address(0));
+        // make sure it is not on sale 
+        if (sellingDict[_objId].price > 0)
+            revert();
+        // not on borrowing
+        BorrowItem storage item = borrowingDict[_objId];
+        if (item.index > 0)
+            revert();
+        // not on battle 
+        EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+        if (battle.isOnBattle(_objId))
+            revert();
+        
         // check ownership
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
@@ -584,5 +616,9 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         price = item.price;
         lent = item.lent;
         releaseBlock = item.releaseBlock;
+    }
+    
+    function isOnTrading(uint64 _objId) constant external returns(bool) {
+        return (sellingDict[_objId].price > 0 || borrowingDict[_objId].owner != address(0));
     }
 }
