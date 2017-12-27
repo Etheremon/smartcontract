@@ -307,7 +307,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
     
-    function hatchedEgg() requireDataContract requireTransformProcessor external {
+    function hatchEgg() requireDataContract requireTransformProcessor external {
         // use as a seed for random
         lastHatchingAddress = msg.sender;
         
