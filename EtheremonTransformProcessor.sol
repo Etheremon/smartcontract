@@ -141,6 +141,7 @@ interface EtheremonWorld {
 }
 
 interface EtheremonBattle {
+    function isOnBattle(uint64 _objId) constant external returns(bool);
     function getMonsterLevel(uint64 _objId) constant public returns(uint8);
 }
 
@@ -305,8 +306,9 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     }
     
     function processRelease(uint64 _objId) public returns(bool) {
+        EtheremonBattle battle = EtheremonBattle(battleContract);
         EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (trade.isOnTrading(_objId))
+        if (battle.isOnBattle(_objId) || trade.isOnTrading(_objId))
             return false;
         // can not release gen 0 
         uint32 classId;
@@ -325,8 +327,9 @@ contract EtheremonTransformProcessor is ProcessorInterface, EtheremonEnum, Basic
     }
     
     function getTransformClass(uint64 _objId) constant public returns(uint32) {
+        EtheremonBattle battle = EtheremonBattle(battleContract);
         EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (trade.isOnTrading(_objId))
+        if (battle.isOnBattle(_objId) || trade.isOnTrading(_objId))
             return 0;
         // not available in this update
         return 0;

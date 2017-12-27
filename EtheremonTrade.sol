@@ -140,7 +140,7 @@ interface EtheremonBattleInterface {
     function isOnBattle(uint64 _objId) constant external returns(bool) ;
 }
 
-contract EtheremonTrade is EtheremonBattleInterface, EtheremonEnum, BasicAccessControl, SafeMath {
+contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     uint8 constant public GEN0_NO = 24;
 

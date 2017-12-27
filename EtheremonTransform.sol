@@ -271,7 +271,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         MonsterObjAcc memory obj;
         uint32 _ = 0;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
-        return (obj.classId, msg.sender);
+        return (obj.classId, obj.trainer);
     }
     
     function layEgg(uint64 _objId) requireDataContract requireTransformProcessor external {
