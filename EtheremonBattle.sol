@@ -719,8 +719,17 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         // make sure none of etheremon is on trade
         EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (!trade.isOnTrading(_aa1) || !trade.isOnTrading(_aa2) || !trade.isOnTrading(_aa3) || 
-            !trade.isOnTrading(_as1) || !trade.isOnTrading(_as2) || !trade.isOnTrading(_as3))
+        if (trade.isOnTrading(_aa1) || trade.isOnTrading(_aa2) || trade.isOnTrading(_aa3) || 
+            trade.isOnTrading(_as1) || trade.isOnTrading(_as2) || trade.isOnTrading(_as3))
+            revert();
+        
+        if (!isValidOwner(_aa1, msg.sender) || !isValidOwner(_aa2, msg.sender) || !isValidOwner(_aa3, msg.sender))
+            revert();
+        if (_as1 > 0 && !isValidOwner(_as1, msg.sender))
+            revert();
+        if (_as2 > 0 && !isValidOwner(_as2, msg.sender))
+            revert();
+        if (_as3 > 0 && !isValidOwner(_as3, msg.sender))
             revert();
         
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
