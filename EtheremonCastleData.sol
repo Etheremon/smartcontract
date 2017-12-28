@@ -133,9 +133,9 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         address owner;
         uint32 totalWin;
         uint32 totalLose;
-        uint64[NO_MONSTER] attackers;
-        uint64[NO_MONSTER] supporters;
-        uint64[NO_BATTLE_LOG] battleList;
+        uint64[3] attackers;
+        uint64[3] supporters;
+        uint64[5] battleList;
         uint lastListIndex;
         uint createdBlock;
     }
@@ -148,15 +148,15 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
     struct BattleDataLog {
         uint32 castleId;
         address attacker;
-        MonsterBattleLog[NO_MONSTER*4] etheremons;
-        uint8[NO_MONSTER] randoms;
+        MonsterBattleLog[12] etheremons;
+        uint8[3] randoms;
         bool win;
     }
     
     struct TrainerBattleLog {
         uint32 totalWin;
         uint32 totalLose;
-        uint64[NO_BATTLE_LOG] battleList;
+        uint64[5] battleList;
         uint lastListIndex;
     }
     

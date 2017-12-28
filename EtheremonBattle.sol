@@ -212,8 +212,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64 battleId;
         uint32 castleId;
         uint castleIndex;
-        uint32[NO_MONSTER*2] monsterExp;
-        uint8[NO_MONSTER] randoms;
+        uint32[6] monsterExp;
+        uint8[3] randoms;
         bool win;
     }
 
@@ -236,7 +236,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint256 public castleFee = 0.1 ether;
     uint256 public castleDestroyBonus = castleFee/2;
     uint8 public maxLevel = 100;
-    uint16 public maxActiveCastle = 100;
+    uint16 public maxActiveCastle = 30;
     uint8 public maxRandomRound = 4;
     uint8 public minDestroyBattle = 15;
     uint8 public minDestroyRate = 40; // percentage
@@ -431,8 +431,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return (classId, exp, stats);
     }
     
-    function getSupportStats(uint64 _objId, uint64 _s1, uint64 _s2, uint64 _s3) constant public returns(uint32, uint32, uint16[STAT_COUNT]){
-        uint16[STAT_COUNT] memory stats;
+    function getSupportStats(uint64 _objId, uint64 _s1, uint64 _s2, uint64 _s3) constant public returns(uint32, uint32, uint16[6]){
+        uint16[6] memory stats;
         uint32 classId = 0;
         uint32 exp = 0;
         (classId, exp, stats) = getCurrentStats(_objId);
@@ -476,6 +476,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return (classId, exp, stats);
     }
     
+    /*
     function canBeAttacker(uint64 _objId) constant external returns(bool) {
         // only gason & ancestor
         EtheremonGateway gateway = EtheremonGateway(worldContract);
@@ -498,7 +499,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint xfactorsLength;
         (classId, exp, isGason, ancestorLength, xfactorsLength) = gateway.getObjBattleInfo(_objId);
         return (isGason || classId <= GEN0_NO);
-    }
+    }*/
     
     function hasAdvantage(uint32 _aClassId, uint32 _bClassId) constant public returns(bool, bool) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
@@ -546,10 +547,10 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function attack(AttackData att) constant private returns(uint32 aExp, uint32 bExp, uint8 ran, bool win) {
         uint32 aClassId;
-        uint16[STAT_COUNT] memory astats;
+        uint16[6] memory astats;
         (aClassId, aExp, astats) = getSupportStats(att.aa1, att.as1, att.as2, att.as3);
         uint32 bClassId;
-        uint16[STAT_COUNT] memory bstats;
+        uint16[6] memory bstats;
         (bClassId, bExp, bstats) = getSupportStats(att.ba1, att.bs1, att.bs2, att.bs3);
         
         bool aHasAdvantage = false;
