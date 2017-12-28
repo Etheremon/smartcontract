@@ -127,12 +127,12 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
     uint8 constant public NO_BATTLE_LOG = 5;
     
     struct CastleData {
-        uint index; // in active castle if it is active
+        uint index; // in active castle if > 0
         uint32 castleId;
         string name;
         address owner;
-        uint16 totalWin;
-        uint16 totalLose;
+        uint32 totalWin;
+        uint32 totalLose;
         uint64[NO_MONSTER] attackers;
         uint64[NO_MONSTER] supporters;
         uint64[NO_BATTLE_LOG] battleList;
@@ -145,7 +145,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         uint32 exp;
     }
     
-    struct MatchDataLog {
+    struct BattleDataLog {
         uint32 castleId;
         address attacker;
         MonsterBattleLog[NO_MONSTER*4] etheremons;
@@ -153,51 +153,44 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         bool win;
     }
     
-    mapping(uint64 => MatchDataLog) matches;
+    struct TrainerBattleLog {
+        uint32 totalWin;
+        uint32 totalLose;
+        uint64[NO_BATTLE_LOG] battleList;
+        uint lastListIndex;
+    }
+    
+    mapping(uint64 => BattleDataLog) battles;
     mapping(address => uint32) trainerCastle;
-    mapping(address => uint64[NO_BATTLE_LOG]) trannerBattleLog;
+    mapping(address => TrainerBattleLog) trannerBattleLog;
     mapping(uint32 => CastleData) castleData;
     uint32[] activeCastleList;
 
     uint32 public totalCastle = 0;
-    uint64 public totalMatches = 0;
-
-    // private
-    function removeCastleFromActive(uint32 _castleId) private {
-        CastleData storage castle = castleData[_castleId];
-        if (castle.index == 0)
-            return;
-        
-        if (castle.index <= activeCastleList.length) {
-            // Move an existing element into the vacated key slot.
-            castleData[activeCastleList[activeCastleList.length-1]].index = castle.index;
-            activeCastleList[castle.index-1] = activeCastleList[activeCastleList.length-1];
-            activeCastleList.length -= 1;
-            castle.index = 0;
-        }
-    }
-
+    uint64 public totalBattle = 0;
     
     // only moderators
     /*
     TO AVOID ANY BUGS, WE ALLOW MODERATORS TO HAVE PERMISSION TO ALL THESE FUNCTIONS AND UPDATE THEM IN EARLY BETA STAGE.
-    AFTER THE SYSTEM IS STABLE, WE WILL REMOVE OWNER OF THIS SMART CONTRACT AND ONLY KEEP ONE MODERATOR.
+    AFTER THE SYSTEM IS STABLE, WE WILL REMOVE OWNER OF THIS SMART CONTRACT AND ONLY KEEP ONE MODERATOR WHICH IS ETHEREMON BATTLE CONTRACT.
     HENCE, THE DECENTRALIZED ATTRIBUTION IS GUARANTEED.
     */
     
     function setCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) onlyModerators external returns(uint32){
         uint32 currentCastleId = trainerCastle[_trainer];
-        CastleData storage castle = castleData[currentCastleId];
+        uint index;
         if (currentCastleId == 0) {
+            // create a new castle
             totalCastle += 1;
             currentCastleId = totalCastle;
             
-            castle.index = ++activeCastleList.length;
-            activeCastleList[castle.index-1] = currentCastleId;
+            index = ++activeCastleList.length;
+            activeCastleList[index-1] = currentCastleId;
             // mark sender
             trainerCastle[msg.sender] = currentCastleId;
         }
-        
+        CastleData storage castle = castleData[currentCastleId];
+        castle.index = index;
         castle.castleId = currentCastleId;
         castle.name = _name;
         castle.owner = msg.sender;
@@ -211,49 +204,59 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return castle.castleId;
     }
     
-    function removeCastle(uint32 _castleId) onlyModerators external {
+    function removeCastleFromActive(uint32 _castleId) onlyModerators external {
         CastleData storage castle = castleData[_castleId];
-        if (castle.owner != msg.sender)
-            revert();
-        removeCastleFromActive(_castleId);
+        if (castle.index == 0)
+            return;
+        
+        if (castle.index <= activeCastleList.length) {
+            // Move an existing element into the vacated key slot.
+            castleData[activeCastleList[activeCastleList.length-1]].index = castle.index;
+            activeCastleList[castle.index-1] = activeCastleList[activeCastleList.length-1];
+            activeCastleList.length -= 1;
+            castle.index = 0;
+        }
     }
     
     function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win) onlyModerators external returns(uint64) {
-        totalMatches += 1;
-        MatchDataLog storage matchLog = matches[totalMatches];
-        matchLog.castleId = _castleId;
-        matchLog.attacker = _attacker;
-        matchLog.randoms[0] = _ran1;
-        matchLog.randoms[1] = _ran2;
-        matchLog.randoms[2] = _ran3;
-        matchLog.win = _win;
+        totalBattle += 1;
+        BattleDataLog storage battleLog = battles[totalBattle];
+        battleLog.castleId = _castleId;
+        battleLog.attacker = _attacker;
+        battleLog.randoms[0] = _ran1;
+        battleLog.randoms[1] = _ran2;
+        battleLog.randoms[2] = _ran3;
+        battleLog.win = _win;
         
         CastleData storage castle = castleData[_castleId];
-        if (_win)
+        TrainerBattleLog storage trainerLog = trannerBattleLog[_attacker];
+        if (_win) {
             castle.totalWin += 1;
-        else
+            trainerLog.totalLose += 1;
+        } else {
             castle.totalLose += 1;
+            trainerLog.totalLose += 1;
+        }
         
         castle.lastListIndex += 1;
         if (castle.lastListIndex >= NO_BATTLE_LOG) {
             castle.lastListIndex = 0;
         }
-        castle.battleList[castle.lastListIndex] = totalMatches;
+        castle.battleList[castle.lastListIndex] = totalBattle;
         
-        uint minIndex = 0;
-        for (uint i=0; i < trannerBattleLog[_attacker].length; i++) {
-            if (trannerBattleLog[_attacker][i] <  trannerBattleLog[_attacker][minIndex])
-                minIndex = i;
+        trainerLog.lastListIndex += 1;
+        if (trainerLog.lastListIndex >= NO_BATTLE_LOG) {
+            trainerLog.lastListIndex = 0;
         }
-        trannerBattleLog[_attacker][minIndex] = totalMatches;
+        trainerLog.battleList[trainerLog.lastListIndex] = totalBattle;
         
-        return totalMatches;
+        return totalBattle;
     }
     
-    function addBattleMonsterLog(uint64 _matchId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external {
-        MatchDataLog storage matchLog = matches[_matchId];
-        matchLog.etheremons[_index].objId = _objId;
-        matchLog.etheremons[_index].exp = _exp;
+    function addBattleMonsterLog(uint64 _battleId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external {
+        BattleDataLog storage battleLog = battles[_battleId];
+        battleLog.etheremons[_index].objId = _objId;
+        battleLog.etheremons[_index].exp = _exp;
     }
     
     // read access 
@@ -266,8 +269,8 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return activeCastleList.length;
     }
     
-    function getCastleBasicInfo(address owner) constant external returns(uint32, uint) {
-        uint32 currentCastleId = trainerCastle[owner];
+    function getCastleBasicInfo(address _owner) constant external returns(uint32, uint) {
+        uint32 currentCastleId = trainerCastle[_owner];
         if (currentCastleId == 0)
             return (0, 0);
         CastleData memory castle = castleData[currentCastleId];
@@ -284,24 +287,24 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return (castle.attackers[0], castle.attackers[1], castle.attackers[2], castle.supporters[0], castle.supporters[1], castle.supporters[2]);
     }
     
-    function getCastleWinLose(uint32 _castleId) constant external returns(uint16, uint16) {
+    function getCastleWinLose(uint32 _castleId) constant external returns(uint32, uint32) {
         CastleData memory castle = castleData[_castleId];
         return (castle.totalWin, castle.totalLose);
     }
     
-    function getCastleStats(uint32 _castleId) constant external returns(string, address, uint16, uint16, uint) {
+    function getCastleStats(uint32 _castleId) constant external returns(string, address, uint32, uint32, uint) {
         CastleData memory castle = castleData[_castleId];
         return (castle.name, castle.owner, castle.totalWin, castle.totalLose, castle.createdBlock);
     }
 
-    function getMatchDataLog(uint64 _matchId) constant external returns(uint32, address, uint8, uint8, uint8, bool) {
-        MatchDataLog memory matchLog = matches[_matchId];
-        return (matchLog.castleId, matchLog.attacker, matchLog.randoms[0], matchLog.randoms[1], matchLog.randoms[2], matchLog.win);
+    function getBattleDataLog(uint64 _matchId) constant external returns(uint32, address, uint8, uint8, uint8, bool) {
+        BattleDataLog memory battleLog = battles[_matchId];
+        return (battleLog.castleId, battleLog.attacker, battleLog.randoms[0], battleLog.randoms[1], battleLog.randoms[2], battleLog.win);
     }
     
     function getMatchMonsterLog(uint64 _matchId, uint _index) constant external returns(uint64, uint32) {
-        MatchDataLog memory matchLog = matches[_matchId];
-        return (matchLog.etheremons[_index].objId, matchLog.etheremons[_index].exp);
+        BattleDataLog memory battleLog = battles[_matchId];
+        return (battleLog.etheremons[_index].objId, battleLog.etheremons[_index].exp);
     }
     
     function getCastleBattleList(uint32 _castleId) constant external returns(uint64, uint64, uint64, uint64, uint64) {
@@ -309,8 +312,9 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return (castle.battleList[0], castle.battleList[1], castle.battleList[2], castle.battleList[3], castle.battleList[4]);
     }
     
-    function getTrainerBattleList(address _trainer) constant external returns(uint64, uint64, uint64, uint64, uint64) {
-        uint64[NO_BATTLE_LOG] memory log = trannerBattleLog[_trainer];
-        return (log[0], log[1], log[2], log[3], log[4]);
+    function getTrainerBattleInfo(address _trainer) constant external returns(uint32, uint32, uint64, uint64, uint64, uint64, uint64) {
+        TrainerBattleLog memory trainerLog = trannerBattleLog[_trainer];
+        return (trainerLog.totalWin, trainerLog.totalLose, trainerLog.battleList[0], trainerLog.battleList[1], trainerLog.battleList[2], 
+            trainerLog.battleList[3], trainerLog.battleList[4]);
     }
 }

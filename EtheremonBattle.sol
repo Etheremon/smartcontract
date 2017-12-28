@@ -143,19 +143,19 @@ contract EtheremonGateway is EtheremonEnum {
 
 contract EtheremonCastleContract is BasicAccessControl{
     uint32 public totalCastle = 0;
-    uint64 public totalMatches = 0;
+    uint64 public totalBattle = 0;
     
     function getCastleBasicInfo(address owner) constant external returns(uint32, uint);
     function getCastleBasicInfoById(uint32 _castleId) constant external returns(uint32, uint);
     function countActiveCastle() constant external returns(uint);
     function getCastleObjInfo(uint32 _castleId) constant external returns(uint64, uint64, uint64, uint64, uint64, uint64);
-    function getCastleWinLose(uint32 _castleId) constant external returns(uint16, uint16);
-    function getCastleStats(uint32 _castleId) constant external returns(string, address, uint16, uint16, uint);
+    function getCastleWinLose(uint32 _castleId) constant external returns(uint32, uint32);
+    function getCastleStats(uint32 _castleId) constant external returns(string, address, uint32, uint32, uint);
 
     function setCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) onlyModerators external returns(uint32);
     function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win) onlyModerators external returns(uint64);
-    function addBattleMonsterLog(uint64 _matchId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external;
-    function removeCastle(uint32 _castleId) onlyModerators external;
+    function addBattleMonsterLog(uint64 _battleId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external;
+    function removeCastleFromActive(uint32 _castleId) onlyModerators external;
     
 }
 
@@ -209,7 +209,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     struct BattleLogData {
-        uint64 matchId;
+        uint64 battleId;
         uint32 castleId;
         uint castleIndex;
         uint32[NO_MONSTER*2] monsterExp;
@@ -218,7 +218,9 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
 
     // event
-    event EventCreateCastle(address indexed owner, uint32 castleId); 
+    event EventCreateCastle(address indexed owner, uint32 castleId);
+    event EventAttackCastle(address indexed attacker, uint32 castleId, bool result);
+    event EventDestroyCastle(uint32 indexed castleId, address destroyer, bool hasBonus);
     
     // linked smart contract
     address public worldContract;
@@ -232,10 +234,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public gasonBuffPercentage = 8;
     uint8 public typeBuffPercentage = 20;
     uint256 public castleFee = 0.1 ether;
+    uint256 public castleDestroyBonus = castleFee/2;
     uint8 public maxLevel = 100;
     uint16 public maxActiveCastle = 100;
     uint8 public maxRandomRound = 4;
-    uint8 public minDestroyBattle = 10;
+    uint8 public minDestroyBattle = 15;
     uint8 public minDestroyRate = 40; // percentage
     
     address private lastAttacker = address(0x0);
@@ -262,10 +265,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
 
 
-    function EtheremonBattle(address _dataContract, address _worldContract, address _tradeContract) public {
+    function EtheremonBattle(address _dataContract, address _worldContract, address _tradeContract, address _castleContract) public {
         dataContract = _dataContract;
         worldContract = _worldContract;
         tradeContract = _tradeContract;
+        castleContract = _castleContract;
     }
     
      // admin & moderators
@@ -280,6 +284,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         typeAdvantages[8] = 5;
         typeAdvantages[9] = 15;
         typeAdvantages[11] = 18;
+        // skipp 10
         typeAdvantages[12] = 7;
         typeAdvantages[13] = 6;
         typeAdvantages[14] = 17;
@@ -298,10 +303,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     
-    function setContract(address _dataContract, address _worldContract, address _tradeContract) onlyModerators external {
+    function setContract(address _dataContract, address _worldContract, address _tradeContract, address _castleContract) onlyModerators external {
         dataContract = _dataContract;
         worldContract = _worldContract;
         tradeContract = _tradeContract;
+        castleContract = _castleContract;
     }
     
     function setConfig(uint8 _ancestorBuffPercentage, uint8 _gasonBuffPercentage, uint8 _typeBuffPercentage, uint256 _castleFee, 
@@ -310,6 +316,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         gasonBuffPercentage = _gasonBuffPercentage;
         typeBuffPercentage = _typeBuffPercentage;
         castleFee = _castleFee;
+        castleDestroyBonus = _castleFee/2;
         maxLevel = _maxLevel;
         maxActiveCastle = _maxActiveCastle;
         maxRandomRound = _maxRandomRound;
@@ -324,7 +331,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return uint8(genNum % maxRan);
     }
     
-    function getLevel(uint32 exp) view internal returns (uint8) {
+    function getLevel(uint32 exp) view public returns (uint8) {
         uint8 level = 1;
         uint8 requirement = maxLevel;
         while(level < maxLevel && exp > requirement) {
@@ -350,39 +357,26 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
     
-    function getMonsterLevel(uint64 _objId) constant external returns(uint8) {
+    function getMonsterLevel(uint64 _objId) constant external returns(uint32, uint8) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
         uint32 _ = 0;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
      
-        return getLevel(obj.exp);
+        return (obj.exp, getLevel(obj.exp));
     }
     
     function getMonsterCP(uint64 _objId) constant external returns(uint64) {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        MonsterObjAcc memory obj;
-        uint32 _ = 0;
-        (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
-     
-    
-        uint256 total = 0;
-        uint i = 0;
-        uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, obj.monsterId);
-        if (baseSize == 0) {
-            // use base as the stat is not generated
-            for(i=0; i < STAT_COUNT; i+=1) {
-                total += data.getElementInArrayType(ArrayType.STAT_START, uint64(obj.classId), i);
-                total += safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(obj.classId), i), getLevel(obj.exp));
-            }
-        } else {
-            for(i=0; i < baseSize; i+=1) {
-                total += data.getElementInArrayType(ArrayType.STAT_BASE, obj.monsterId, i);
-                total += safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(obj.classId), i), getLevel(obj.exp));
-            }
-        }
+        uint16[STAT_COUNT] memory stats;
+        uint32 classId = 0;
+        uint32 exp = 0;
+        (classId, exp, stats) = getCurrentStats(_objId);
         
-        return uint64(total/baseSize);
+        uint256 total;
+        for(uint i=0; i < STAT_COUNT; i+=1) {
+            total += stats[i];
+        }
+        return uint64(total/STAT_COUNT);
     }
     
     function isOnBattle(uint64 _objId) constant external returns(bool) {
@@ -594,15 +588,18 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         win = astats[0] >= bstats[0];
     }
     
-    function destroyCastle(uint32 _castleId) private {
+    function destroyCastle(uint32 _castleId) private returns(bool){
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
-        uint16 totalWin;
-        uint16 totalLose;
+        uint32 totalWin;
+        uint32 totalLose;
         (totalWin, totalLose) = castle.getCastleWinLose(_castleId);
         if (totalWin + totalLose > minDestroyBattle) {
-            if (totalWin * 100 / totalLose < minDestroyRate)
-                castle.removeCastle(_castleId);
+            if (totalWin * 100 / totalLose < minDestroyRate) {
+                castle.removeCastleFromActive(_castleId);
+                return true;
+            }
         }
+        return false;
     }
     
     // public
@@ -694,22 +691,33 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (log.win)
             countWin += 1; 
         
-        log.matchId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], !(countWin>=2));
-        castle.addBattleMonsterLog(log.matchId, b.a1, log.monsterExp[3], 0);
-        castle.addBattleMonsterLog(log.matchId, b.a2, log.monsterExp[4], 0);
-        castle.addBattleMonsterLog(log.matchId, b.a3, log.monsterExp[5], 0);
-        castle.addBattleMonsterLog(log.matchId, b.s1, 0, 0);
-        castle.addBattleMonsterLog(log.matchId, b.s2, 0, 0);
-        castle.addBattleMonsterLog(log.matchId, b.s3, 0, 0);
+        log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], !(countWin>=2));
+        castle.addBattleMonsterLog(log.battleId, b.a1, log.monsterExp[3], 0);
+        castle.addBattleMonsterLog(log.battleId, b.a2, log.monsterExp[4], 0);
+        castle.addBattleMonsterLog(log.battleId, b.a3, log.monsterExp[5], 0);
+        castle.addBattleMonsterLog(log.battleId, b.s1, 0, 0);
+        castle.addBattleMonsterLog(log.battleId, b.s2, 0, 0);
+        castle.addBattleMonsterLog(log.battleId, b.s3, 0, 0);
         
-        castle.addBattleMonsterLog(log.matchId, _aa1, log.monsterExp[0], 0);
-        castle.addBattleMonsterLog(log.matchId, _aa2, log.monsterExp[1], 0);
-        castle.addBattleMonsterLog(log.matchId, _aa3, log.monsterExp[2], 0);
-        castle.addBattleMonsterLog(log.matchId, _as1, 0, 0);
-        castle.addBattleMonsterLog(log.matchId, _as2, 0, 0);
-        castle.addBattleMonsterLog(log.matchId, _as3, 0, 0);
+        castle.addBattleMonsterLog(log.battleId, _aa1, log.monsterExp[0], 0);
+        castle.addBattleMonsterLog(log.battleId, _aa2, log.monsterExp[1], 0);
+        castle.addBattleMonsterLog(log.battleId, _aa3, log.monsterExp[2], 0);
+        castle.addBattleMonsterLog(log.battleId, _as1, 0, 0);
+        castle.addBattleMonsterLog(log.battleId, _as2, 0, 0);
+        castle.addBattleMonsterLog(log.battleId, _as3, 0, 0);
     
-        destroyCastle(_castleId);
+        if (destroyCastle(_castleId)) {
+            // send bonus if smart contract has money 
+            if (this.balance > castleDestroyBonus) {
+                // no guarantee
+                if(msg.sender.send(castleDestroyBonus))
+                    EventDestroyCastle(_castleId, msg.sender, true);
+                else
+                    EventDestroyCastle(_castleId, msg.sender, false);
+            }
+        }
+        
+        EventAttackCastle(msg.sender, _castleId, countWin>=2);
     }
     
 }
