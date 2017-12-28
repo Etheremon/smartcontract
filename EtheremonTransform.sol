@@ -76,6 +76,10 @@ contract BasicAccessControl {
             totalModerators -= 1;
         }
     }
+
+    function UpdateMaintaining(bool _isMaintaining) onlyOwner public {
+        isMaintaining = _isMaintaining;
+    }
 }
 
 contract EtheremonEnum {

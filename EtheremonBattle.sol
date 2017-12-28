@@ -76,6 +76,10 @@ contract BasicAccessControl {
             totalModerators -= 1;
         }
     }
+
+    function UpdateMaintaining(bool _isMaintaining) onlyOwner public {
+        isMaintaining = _isMaintaining;
+    }
 }
 
 contract EtheremonEnum {
@@ -238,7 +242,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public ancestorBuffPercentage = 4;
     uint8 public gasonBuffPercentage = 8;
     uint8 public typeBuffPercentage = 20;
-    uint256 public castleMinFee = 0.1 ether;
+    uint256 public castleMinFee = 0.2 ether;
     uint8 public castleDestroyBonus = 50;// percentage
     uint8 public maxLevel = 100;
     uint16 public maxActiveCastle = 30;

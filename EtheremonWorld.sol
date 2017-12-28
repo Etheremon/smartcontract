@@ -62,7 +62,6 @@ contract BasicAccessControl {
         }
     }
 
-
     function AddModerator(address _newModerator) onlyOwner public {
         if (moderators[_newModerator] == false) {
             moderators[_newModerator] = true;
@@ -75,6 +74,10 @@ contract BasicAccessControl {
             moderators[_oldModerator] = false;
             totalModerators -= 1;
         }
+    }
+    
+    function UpdateMaintaining(bool _isMaintaining) onlyOwner public {
+        isMaintaining = _isMaintaining;
     }
 }
 
