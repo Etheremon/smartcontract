@@ -35,7 +35,7 @@ contract BasicAccessControl {
     // address[] public moderators;
     uint16 public totalModerators = 0;
     mapping (address => bool) public moderators;
-    bool public isMaintaining = false;
+    bool public isMaintaining = true;
 
     function BasicAccessControl() public {
         owner = msg.sender;

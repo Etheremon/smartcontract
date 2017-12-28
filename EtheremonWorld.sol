@@ -35,7 +35,7 @@ contract BasicAccessControl {
     // address[] public moderators;
     uint16 public totalModerators = 0;
     mapping (address => bool) public moderators;
-    bool public isMaintaining = false;
+    bool public isMaintaining = true;
 
     function BasicAccessControl() public {
         owner = msg.sender;
@@ -140,10 +140,10 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
     function getMonsterReturn(uint64 _objId) constant public returns(uint256 current, uint256 total);
 }
 
-contract EtheremonGateway is EtheremonEnum {
+contract EtheremonGateway is EtheremonEnum, BasicAccessControl {
     // using for battle contract later
-    function increaseMonsterExp(uint64 _objId, uint32 amount) public;
-    function decreaseMonsterExp(uint64 _objId, uint32 amount) public;
+    function increaseMonsterExp(uint64 _objId, uint32 amount) onlyModerators public;
+    function decreaseMonsterExp(uint64 _objId, uint32 amount) onlyModerators public;
     
     // read 
     function isGason(uint64 _objId) constant external returns(bool);
@@ -153,7 +153,7 @@ contract EtheremonGateway is EtheremonEnum {
     function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant external returns(uint32);
 }
 
-contract EtheremonWorld is EtheremonGateway, BasicAccessControl, SafeMath {
+contract EtheremonWorld is EtheremonGateway, SafeMath {
     // old processor
     address constant public ETHEREMON_PROCESSOR = address(0x8a60806F05876f4d6dB00c877B0558DbCAD30682);
     uint8 constant public STAT_COUNT = 6;
