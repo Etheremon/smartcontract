@@ -235,15 +235,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     function addNewObj(address _trainer, uint32 _classId) private returns(uint64) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint64 objId = data.addMonsterObj(_classId, _trainer, "..name me...");
-        if (objId > 1) {
-            // generate base stat for the previous one
-            uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, objId-1);
-            if (baseSize == 0) {
-                for (uint i=0; i < STAT_COUNT; i+= 1) {
-                    uint8 value = getRandom(STAT_MAX, uint8(i), _trainer) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
-                    data.addElementToArrayType(ArrayType.STAT_BASE, objId-1, value);
-                }
-            }
+        for (uint i=0; i < STAT_COUNT; i+= 1) {
+            uint8 value = getRandom(STAT_MAX, uint8(i), lastHatchingAddress) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
+            data.addElementToArrayType(ArrayType.STAT_BASE, objId, value);
         }
         return objId;
     }

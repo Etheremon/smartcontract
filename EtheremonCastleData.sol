@@ -99,7 +99,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         uint256 price;
         uint32 minBattle;
         uint lastListIndex;
-        uint createdBlock;
+        uint createTime;
     }
     
     struct MonsterBattleLog {
@@ -113,12 +113,14 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         MonsterBattleLog[12] etheremons;
         uint8[3] randoms;
         bool win;
+        uint256 bonus;
     }
     
     struct TrainerBattleLog {
         uint32 totalCastle;
         uint32 totalWin;
         uint32 totalLose;
+        uint256 totalBonus;
         uint64[5] battleList;
         uint lastListIndex;
     }
@@ -164,7 +166,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         castle.supporters[0] = _s1;
         castle.supporters[1] = _s2;
         castle.supporters[2] = _s3;
-        castle.createdBlock = block.number;
+        castle.createTime = now;
     }
     
     function setCastlePrice(uint32 _castleId, uint256 _price, uint32 _minBattle) onlyModerators external {
@@ -188,7 +190,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         }
     }
     
-    function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win) onlyModerators external returns(uint64) {
+    function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win, uint256 _bonus) onlyModerators external returns(uint64) {
         totalBattle += 1;
         BattleDataLog storage battleLog = battles[totalBattle];
         battleLog.castleId = _castleId;
@@ -197,9 +199,11 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         battleLog.randoms[1] = _ran2;
         battleLog.randoms[2] = _ran3;
         battleLog.win = _win;
+        battleLog.bonus = _bonus;
         
         CastleData storage castle = castleData[_castleId];
         TrainerBattleLog storage trainerLog = trannerBattleLog[_attacker];
+        trainerLog.totalBonus += _bonus;
         if (_win) {
             castle.totalWin += 1;
             trainerLog.totalLose += 1;
@@ -268,12 +272,12 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
     
     function getCastleStats(uint32 _castleId) constant external returns(string, address, uint256, uint32, uint32, uint32, uint) {
         CastleData memory castle = castleData[_castleId];
-        return (castle.name, castle.owner, castle.price, castle.minBattle, castle.totalWin, castle.totalLose, castle.createdBlock);
+        return (castle.name, castle.owner, castle.price, castle.minBattle, castle.totalWin, castle.totalLose, castle.createTime);
     }
 
-    function getBattleDataLog(uint64 _matchId) constant external returns(uint32, address, uint8, uint8, uint8, bool) {
+    function getBattleDataLog(uint64 _matchId) constant external returns(uint32, address, uint256, uint8, uint8, uint8, bool) {
         BattleDataLog memory battleLog = battles[_matchId];
-        return (battleLog.castleId, battleLog.attacker, battleLog.randoms[0], battleLog.randoms[1], battleLog.randoms[2], battleLog.win);
+        return (battleLog.castleId, battleLog.attacker, battleLog.bonus, battleLog.randoms[0], battleLog.randoms[1], battleLog.randoms[2], battleLog.win);
     }
     
     function getBattleMonsterLog(uint64 _matchId, uint _index) constant external returns(uint64, uint32) {
@@ -286,9 +290,9 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return (castle.battleList[0], castle.battleList[1], castle.battleList[2], castle.battleList[3], castle.battleList[4]);
     }
     
-    function getTrainerBattleInfo(address _trainer) constant external returns(uint32, uint32, uint32, uint64, uint64, uint64, uint64, uint64) {
+    function getTrainerBattleInfo(address _trainer) constant external returns(uint32, uint32, uint32, uint256, uint64, uint64, uint64, uint64, uint64) {
         TrainerBattleLog memory trainerLog = trannerBattleLog[_trainer];
-        return (trainerLog.totalWin, trainerLog.totalLose, trainerLog.totalCastle, trainerLog.battleList[0], trainerLog.battleList[1], trainerLog.battleList[2], 
+        return (trainerLog.totalWin, trainerLog.totalLose, trainerLog.totalCastle, trainerLog.totalBonus, trainerLog.battleList[0], trainerLog.battleList[1], trainerLog.battleList[2], 
             trainerLog.battleList[3], trainerLog.battleList[4]);
     }
     

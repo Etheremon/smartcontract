@@ -203,6 +203,8 @@ contract EtheremonWorld is EtheremonGateway, SafeMath {
     uint256 public totalEarn = 0; // exclude gen 0
     uint16 public priceIncreasingRatio = 1000;
     uint public maxDexSize = 500;
+    
+    address private lastHunter = address(0x0);
 
     // data contract
     address public dataContract;
@@ -511,17 +513,13 @@ contract EtheremonWorld is EtheremonGateway, SafeMath {
         
         // add monster
         uint64 objId = data.addMonsterObj(_classId, msg.sender, _name);
-        if (objId > 1) {
-            // generate base stat for the previous one
-            uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, objId-1);
-            if (baseSize == 0) {
-                for (uint i=0; i < STAT_COUNT; i+= 1) {
-                    uint8 value = getRandom(STAT_MAX, uint8(i), msg.sender) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
-                    data.addElementToArrayType(ArrayType.STAT_BASE, objId-1, value);
-                }
-            }
+        // generate base stat for the previous one
+        for (uint i=0; i < STAT_COUNT; i+= 1) {
+            uint8 value = getRandom(STAT_MAX, uint8(i), lastHunter) + data.getElementInArrayType(ArrayType.STAT_START, uint64(_classId), i);
+            data.addElementToArrayType(ArrayType.STAT_BASE, objId, value);
         }
         
+        lastHunter = msg.sender;
         EventCatchMonster(msg.sender, objId);
     }
 

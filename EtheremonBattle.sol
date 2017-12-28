@@ -160,7 +160,7 @@ contract EtheremonCastleContract is BasicAccessControl{
 
     function setCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) onlyModerators external returns(uint32 currentCastleId);
     function setCastlePrice(uint32 _castleId, uint256 _price, uint32 _minBattle) onlyModerators external;
-    function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win) onlyModerators external returns(uint64);
+    function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win, uint256 _bonus) onlyModerators external returns(uint64);
     function addBattleMonsterLog(uint64 _battleId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external;
     function removeCastleFromActive(uint32 _castleId) onlyModerators external;
 }
@@ -360,10 +360,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function getGainExp(uint32 _exp1, uint32 _exp2, bool _win, bool _isAttacker) view public returns(uint32){
-        uint8 halfLevel1 = getLevel(_exp1)/2;
+        uint8 level = getLevel(_exp1);
+        uint8 halfLevel1 = level/2;
         uint32 gainExp = 1;
-        uint256 rate = (21 ** uint256(halfLevel1)) * 10 / (20 ** uint256(halfLevel1));
-        rate = rate * rate / 100;
+        uint256 rate = (21 ** uint256(halfLevel1)) * 1000 / (20 ** uint256(halfLevel1));
+        rate = rate * rate;
+        if (level > 2 * halfLevel1) rate = rate * 21 / 20;
+        rate = rate / 1000000;
         if (_win) {
             if (_isAttacker) {
                 gainExp = uint32(30 * rate);
@@ -640,14 +643,16 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         win = aStats[0] >= bStats[0];
     }
     
-    function destroyCastle(uint32 _castleId) private returns(uint256){
+    function destroyCastle(uint32 _castleId, bool win) private returns(uint256){
+        if (!win)
+            return 0;
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 totalWin;
         uint32 totalLose;
         uint256 price;
         uint32 minBattle;
         (totalWin, totalLose, price, minBattle) = castle.getCastleWinLose(_castleId);
-        if (totalWin + totalLose > minBattle) {
+        if (totalWin + totalLose >= minBattle) {
             if (totalWin * 100 / totalLose < minDestroyRate) {
                 castle.removeCastleFromActive(_castleId);
                 return price;
@@ -657,7 +662,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // public
-    function setCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) requireDataContract 
+    function setCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requireDataContract 
         requireTradeContract requireCastleContract payable external {
         if (_a1 == 0 || _a2 == 0 || _a3 == 0)
             revert();
@@ -696,7 +701,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         EventCreateCastle(msg.sender, castleId);
     }
     
-    function removeCastle(uint32 _castleId) requireCastleContract external {
+    function removeCastle(uint32 _castleId) isActive requireCastleContract external {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint index;
         address owner;
@@ -708,7 +713,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         EventRemoveCastle(_castleId);
     }
     
-    function attackCastle(uint32 _castleId, uint64 _aa1, uint64 _aa2, uint64 _aa3, uint64 _as1, uint64 _as2, uint64 _as3) requireDataContract 
+    function attackCastle(uint32 _castleId, uint64 _aa1, uint64 _aa2, uint64 _aa3, uint64 _as1, uint64 _as2, uint64 _as3) isActive requireDataContract 
         requireTradeContract requireCastleContract external {
         if (_aa1 == 0 || _aa2 == 0 || _aa3 == 0)
             revert();
@@ -761,7 +766,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (log.win)
             countWin += 1; 
         
-        log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], !(countWin>=2));
+        log.castleBonus = destroyCastle(_castleId, countWin>=2);
+        log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], !(countWin>=2), log.castleBonus);
         castle.addBattleMonsterLog(log.battleId, b.a1, log.monsterExp[3], 0);
         castle.addBattleMonsterLog(log.battleId, b.a2, log.monsterExp[4], 0);
         castle.addBattleMonsterLog(log.battleId, b.a3, log.monsterExp[5], 0);
@@ -775,8 +781,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castle.addBattleMonsterLog(log.battleId, _as1, 0, 0);
         castle.addBattleMonsterLog(log.battleId, _as2, 0, 0);
         castle.addBattleMonsterLog(log.battleId, _as3, 0, 0);
-    
-        log.castleBonus = destroyCastle(_castleId);
+
         if (log.castleBonus  > 0) {
             // send bonus if smart contract has enough money 
             if (this.balance > log.castleBonus) {
