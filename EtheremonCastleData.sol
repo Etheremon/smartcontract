@@ -209,7 +209,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
             trainerLog.totalLose += 1;
         } else {
             castle.totalLose += 1;
-            trainerLog.totalLose += 1;
+            trainerLog.totalWin += 1;
         }
         
         castle.lastListIndex += 1;
