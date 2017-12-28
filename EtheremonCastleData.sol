@@ -132,7 +132,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         string name;
         address owner;
         uint16 totalWin;
-        uint16 totalLoose;
+        uint16 totalLose;
         uint64[NO_MONSTER] attackers;
         uint64[NO_MONSTER] supporters;
         uint64[NO_BATTLE_LOG] battleList;
@@ -232,7 +232,7 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         if (_win)
             castle.totalWin += 1;
         else
-            castle.totalLoose += 1;
+            castle.totalLose += 1;
         
         castle.lastListIndex += 1;
         if (castle.lastListIndex >= NO_BATTLE_LOG) {
@@ -284,14 +284,14 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
         return (castle.attackers[0], castle.attackers[1], castle.attackers[2], castle.supporters[0], castle.supporters[1], castle.supporters[2]);
     }
     
-    function getCastleWinLoose(uint32 _castleId) constant external returns(uint16, uint16) {
+    function getCastleWinLose(uint32 _castleId) constant external returns(uint16, uint16) {
         CastleData memory castle = castleData[_castleId];
-        return (castle.totalWin, castle.totalLoose);
+        return (castle.totalWin, castle.totalLose);
     }
     
     function getCastleStats(uint32 _castleId) constant external returns(string, address, uint16, uint16, uint) {
         CastleData memory castle = castleData[_castleId];
-        return (castle.name, castle.owner, castle.totalWin, castle.totalLoose, castle.createdBlock);
+        return (castle.name, castle.owner, castle.totalWin, castle.totalLose, castle.createdBlock);
     }
 
     function getMatchDataLog(uint64 _matchId) constant external returns(uint32, address, uint8, uint8, uint8, bool) {

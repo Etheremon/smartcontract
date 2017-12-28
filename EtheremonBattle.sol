@@ -149,7 +149,7 @@ contract EtheremonCastleContract is BasicAccessControl{
     function getCastleBasicInfoById(uint32 _castleId) constant external returns(uint32, uint);
     function countActiveCastle() constant external returns(uint);
     function getCastleObjInfo(uint32 _castleId) constant external returns(uint64, uint64, uint64, uint64, uint64, uint64);
-    function getCastleWinLoose(uint32 _castleId) constant external returns(uint16, uint16);
+    function getCastleWinLose(uint32 _castleId) constant external returns(uint16, uint16);
     function getCastleStats(uint32 _castleId) constant external returns(string, address, uint16, uint16, uint);
 
     function setCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) onlyModerators external returns(uint32);
@@ -597,10 +597,10 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     function destroyCastle(uint32 _castleId) private {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint16 totalWin;
-        uint16 totalLoose;
-        (totalWin, totalLoose) = castle.getCastleWinLoose(_castleId);
-        if (totalWin + totalLoose > minDestroyBattle) {
-            if (totalWin * 100 / totalLoose < minDestroyRate)
+        uint16 totalLose;
+        (totalWin, totalLose) = castle.getCastleWinLose(_castleId);
+        if (totalWin + totalLose > minDestroyBattle) {
+            if (totalWin * 100 / totalLose < minDestroyRate)
                 castle.removeCastle(_castleId);
         }
     }
