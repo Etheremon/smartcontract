@@ -659,8 +659,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         // make sure none of etheremon is on trade
         EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (!trade.isOnTrading(_a1) || !trade.isOnTrading(_a2) || !trade.isOnTrading(_a3) || 
-            !trade.isOnTrading(_s1) || !trade.isOnTrading(_s2) || !trade.isOnTrading(_s3))
+        if (trade.isOnTrading(_a1) || trade.isOnTrading(_a2) || trade.isOnTrading(_a3) || 
+            trade.isOnTrading(_s1) || trade.isOnTrading(_s2) || trade.isOnTrading(_s3))
             revert();
         
         if (!isValidOwner(_a1, msg.sender) || !isValidOwner(_a2, msg.sender) || !isValidOwner(_a3, msg.sender))
@@ -717,7 +717,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         BattleLogData memory log;
         (log.castleIndex, log.castleOwner) = castle.getCastleBasicInfoById(_castleId);
-        if (log.castleId == 0 || log.castleIndex == 0)
+        if (log.castleId == 0 || log.castleIndex == 0 || log.castleOwner == msg.sender)
             revert();
         
         EtheremonGateway gateway = EtheremonGateway(worldContract);

@@ -146,14 +146,14 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
             index = ++activeCastleList.length;
             activeCastleList[index-1] = currentCastleId;
             // mark sender
-            trainerCastle[msg.sender] = currentCastleId;
+            trainerCastle[_trainer] = currentCastleId;
             trannerBattleLog[_trainer].totalCastle += 1;
         }
         CastleData storage castle = castleData[currentCastleId];
         castle.index = index;
         castle.castleId = currentCastleId;
         castle.name = _name;
-        castle.owner = msg.sender;
+        castle.owner = _trainer;
         castle.attackers[0] = _a1;
         castle.attackers[1] = _a2;
         castle.attackers[2] = _a3;
