@@ -661,24 +661,40 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return 0;
     }
     
-    // public
-    function setCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requireDataContract 
-        requireTradeContract requireCastleContract payable external {
+    function hasValidParam(address trainer, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) constant internal returns(bool) {
         if (_a1 == 0 || _a2 == 0 || _a3 == 0)
-            revert();
-        // make sure none of etheremon is on trade
+            return false;
+        if (_a1 == _a2 || _a1 == _a3 || _a1 == _s1 || _a1 == _s2 || _a1 == _s3)
+            return false;
+        if (_a2 == _a3 || _a2 == _s1 || _a2 == _s2 || _a2 == _s3)
+            return false;
+        if (_a3 == _s1 || _a3 == _s2 || _a3 == _s3)
+            return false;
+        if (_s1 > 0 && (_s1 == _s2 || _s1 == _s3))
+            return false;
+        if (_s2 > 0 && (_s2 == _s3))
+            return false;
+        
         EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
         if (trade.isOnTrading(_a1) || trade.isOnTrading(_a2) || trade.isOnTrading(_a3) || 
             trade.isOnTrading(_s1) || trade.isOnTrading(_s2) || trade.isOnTrading(_s3))
-            revert();
+            return false;
         
-        if (!isValidOwner(_a1, msg.sender) || !isValidOwner(_a2, msg.sender) || !isValidOwner(_a3, msg.sender))
-            revert();
-        if (_s1 > 0 && !isValidOwner(_s1, msg.sender))
-            revert();
-        if (_s2 > 0 && !isValidOwner(_s2, msg.sender))
-            revert();
-        if (_s3 > 0 && !isValidOwner(_s3, msg.sender))
+        if (!isValidOwner(_a1, trainer) || !isValidOwner(_a2, trainer) || !isValidOwner(_a3, trainer))
+            return false;
+        if (_s1 > 0 && !isValidOwner(_s1, trainer))
+            return false;
+        if (_s2 > 0 && !isValidOwner(_s2, trainer))
+            return false;
+        if (_s3 > 0 && !isValidOwner(_s3, trainer))
+            return false;
+    }
+    
+    // public
+    function setCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requireDataContract 
+        requireTradeContract requireCastleContract payable external {
+        
+        if (!hasValidParam(msg.sender, _a1, _a2, _a3, _s1, _s2, _s3))
             revert();
         
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
@@ -695,6 +711,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             castleId = castle.setCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3);
             castle.setCastlePrice(castleId, (msg.value * castleDestroyBonus / 100), uint32(msg.value * minDestroyBattle / castleMinFee));
         } else {
+            if (msg.value > 0)
+                revert();
             castle.setCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3);
         }
         
@@ -715,21 +733,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function attackCastle(uint32 _castleId, uint64 _aa1, uint64 _aa2, uint64 _aa3, uint64 _as1, uint64 _as2, uint64 _as3) isActive requireDataContract 
         requireTradeContract requireCastleContract external {
-        if (_aa1 == 0 || _aa2 == 0 || _aa3 == 0)
-            revert();
-        // make sure none of etheremon is on trade
-        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (trade.isOnTrading(_aa1) || trade.isOnTrading(_aa2) || trade.isOnTrading(_aa3) || 
-            trade.isOnTrading(_as1) || trade.isOnTrading(_as2) || trade.isOnTrading(_as3))
-            revert();
-        
-        if (!isValidOwner(_aa1, msg.sender) || !isValidOwner(_aa2, msg.sender) || !isValidOwner(_aa3, msg.sender))
-            revert();
-        if (_as1 > 0 && !isValidOwner(_as1, msg.sender))
-            revert();
-        if (_as2 > 0 && !isValidOwner(_as2, msg.sender))
-            revert();
-        if (_as3 > 0 && !isValidOwner(_as3, msg.sender))
+        if (!hasValidParam(msg.sender, _aa1, _aa2, _aa3, _as1, _as2, _as3))
             revert();
         
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
