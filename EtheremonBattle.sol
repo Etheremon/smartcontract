@@ -35,7 +35,7 @@ contract BasicAccessControl {
     // address[] public moderators;
     uint16 public totalModerators = 0;
     mapping (address => bool) public moderators;
-    bool public isMaintaining = true;
+    bool public isMaintaining = false;
 
     function BasicAccessControl() public {
         owner = msg.sender;
@@ -47,7 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        require(moderators[msg.sender] == true);
+        require(msg.sender == owner || moderators[msg.sender] == true);
         _;
     }
 
@@ -108,6 +108,12 @@ contract EtheremonEnum {
         ANCESTOR,
         XFACTOR
     }
+    
+    enum BattleResult {
+        CASTLE_WIN,
+        CASTLE_LOSE,
+        CASTLE_DESTROYED
+    }
 }
 
 contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
@@ -145,24 +151,26 @@ contract EtheremonGateway is EtheremonEnum, BasicAccessControl {
     function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant external returns(uint32);
 }
 
-contract EtheremonCastleContract is BasicAccessControl{
+contract EtheremonCastleContract is EtheremonEnum, BasicAccessControl{
+
     uint32 public totalCastle = 0;
     uint64 public totalBattle = 0;
     
-    function getCastlePrice(uint32 _castleId) constant external returns(uint256);
-    function getCastleBasicInfo(address owner) constant external returns(uint32, uint);
-    function getCastleBasicInfoById(uint32 _castleId) constant external returns(uint, address);
+    function getCastleBasicInfo(address owner) constant external returns(uint32, uint, uint256);
+    function getCastleBasicInfoById(uint32 _castleId) constant external returns(uint, address, uint256);
     function countActiveCastle() constant external returns(uint);
     function getCastleObjInfo(uint32 _castleId) constant external returns(uint64, uint64, uint64, uint64, uint64, uint64);
     function getCastleStats(uint32 _castleId) constant external returns(string, address, uint256, uint32, uint32, uint32, uint);
     function isOnCastle(uint32 _castleId, uint64 _objId) constant external returns(bool);
     function getCastleWinLose(uint32 _castleId) constant external returns(uint32, uint32, uint256, uint32);
 
-    function setCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) onlyModerators external returns(uint32 currentCastleId);
-    function setCastlePrice(uint32 _castleId, uint256 _price, uint32 _minBattle) onlyModerators external;
-    function addBattleLog(uint32 _castleId, address _attacker, uint8 _ran1, uint8 _ran2, uint8 _ran3, bool _win, uint256 _bonus) onlyModerators external returns(uint64);
-    function addBattleMonsterLog(uint64 _battleId, uint64 _objId, uint32 _exp, uint _index) onlyModerators external;
+    function addCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, 
+        uint256 _price, uint32 _minBattle) onlyModerators external returns(uint32 currentCastleId);
+    function renameCastle(uint32 _castleId, string _name) onlyModerators external;
     function removeCastleFromActive(uint32 _castleId) onlyModerators external;
+    function addBattleLog(uint32 _castleId, address _attacker, 
+        uint8 _ran1, uint8 _ran2, uint8 _ran3, BattleResult _result, uint32 _castleExp1, uint32 _castleExp2, uint32 _castleExp3) onlyModerators external returns(uint64);
+    function addBattleLogMonsterInfo(uint64 _battleId, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, uint32 _exp1, uint32 _exp2, uint32 _exp3) onlyModerators external;
 }
 
 contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
@@ -198,15 +206,26 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64 s3;
     }
 
+    struct SupporterData {
+        uint32 classId1;
+        bool isGason1;
+        uint8[] types1;
+        uint32 classId2;
+        bool isGason2;
+        uint8[] types2;
+        uint32 classId3;
+        bool isGason3;
+        uint8[] types3;
+    }
+
     struct AttackData {
-        uint64 aa1;
-        uint64 as1;
-        uint64 as2;
-        uint64 as3;
-        uint64 ba1;
-        uint64 bs1;
-        uint64 bs2;
-        uint64 bs3;
+        uint64 aa;
+        SupporterData asup;
+        uint16 aAttackSupport;
+        uint64 ba;
+        SupporterData bsup;
+        uint16 bAttackSupport;
+        uint8 index;
     }
     
     struct MonsterBattleLog {
@@ -219,16 +238,17 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64 battleId;
         uint32 castleId;
         uint256 castleBonus;
+        uint256 castlePrice;
         uint castleIndex;
         uint32[6] monsterExp;
         uint8[3] randoms;
         bool win;
+        BattleResult result;
     }
 
     // event
     event EventCreateCastle(address indexed owner, uint32 castleId);
-    event EventAttackCastle(address indexed attacker, uint32 castleId, bool result);
-    event EventDestroyCastle(uint32 indexed castleId, address destroyer, bool hasBonus);
+    event EventAttackCastle(address indexed attacker, uint32 castleId, uint8 result);
     event EventRemoveCastle(uint32 indexed castleId);
     
     // linked smart contract
@@ -305,7 +325,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         typeAdvantages[16] = 12;
         typeAdvantages[17] = 1;
         typeAdvantages[18] = 4;
-    } 
+    }
+    
+    function setTypeAdvantage(uint8 type1, uint8 type2) onlyModerators external {
+        typeAdvantages[type1] = type2;
+    }
      
     function withdrawEther(address _sendTo, uint _amount) onlyModerators external {
         if (_amount > this.balance) {
@@ -419,9 +443,10 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 castleId;
         uint castleIndex = 0;
+        uint256 price = 0;
         MonsterObjAcc memory obj;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
-        (castleId, castleIndex) = castle.getCastleBasicInfo(obj.trainer);
+        (castleId, castleIndex, price) = castle.getCastleBasicInfo(obj.trainer);
         if (castleId > 0 && castleIndex > 0)
             return castle.isOnCastle(castleId, _objId);
         return false;
@@ -468,102 +493,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return (classId, exp, stats);
     }
     
-    function checkGasonEffect(uint32 _classId, uint64 _gasSonObjId) constant public returns(uint8){
-        if (_gasSonObjId == 0)
-            return 0;
-        EtheremonGateway gateway = EtheremonGateway(worldContract);
-        uint32 gasClassId;
-        uint32 exp;
-        bool isGason; 
-        uint temp;
-        (gasClassId, exp, isGason, temp, temp) = gateway.getObjBattleInfo(_gasSonObjId);
-        if (!isGason)
-            return 0;
-
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, _classId);
-        uint typeGasSize = data.getSizeArrayType(ArrayType.CLASS_TYPE, gasClassId);
-        uint8 aType = 0;
-        uint8 bType = 0;
-        if (temp > 0)
-            temp -= 1;
-        for (; temp >= 0; temp--) {
-            aType = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(_classId), temp);
-            for (uint j = 0; j < typeGasSize; j++) {
-                bType = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(gasClassId), j);
-                if (aType == bType)
-                    return 2;
-            }
-        }
-        return 1;
-    }
-    
-    function getSupportIncreasingStats(uint64 _objId, uint64 _s1, uint64 _s2, uint64 _s3) constant public returns(uint16[6]){
-        uint16[6] memory stats;
-        uint32 objClassId = getMonsterClassId(_objId);
-        uint32 s1ClassId = getMonsterClassId(_s1);
-        uint32 s2ClassId = getMonsterClassId(_s2);
-        uint32 s3ClassId = getMonsterClassId(_s3);
-        
-        EtheremonGateway gateway = EtheremonGateway(worldContract);
-        // check ancestors
-        uint i =0;
-        uint8 countEffect = 0;
-        uint ancestorSize = gateway.getClassPropertySize(objClassId, PropertyType.ANCESTOR);
-        if (ancestorSize > 0) {
-            
-            uint32 ancestorClass = 0;
-            for (i=0; i < ancestorSize; i ++) {
-                ancestorClass = gateway.getClassPropertyValue(objClassId, PropertyType.ANCESTOR, i);
-                if (ancestorClass == s1ClassId || ancestorClass == s2ClassId || ancestorClass == s3ClassId) {
-                    countEffect += 1;
-                }
-            }
-            if (countEffect > 0) {
-                for(i=0; i < STAT_COUNT; i+=1) {
-                    stats[i] = countEffect * ancestorBuffPercentage;
-                }
-            }
-        }
-        // check gason
-        countEffect = checkGasonEffect(objClassId, _s1);
-        countEffect += checkGasonEffect(objClassId, _s2);
-        countEffect += checkGasonEffect(objClassId, _s3);
-        // gason increase attack and special attack 
-        // hp, atk, def, spa, spd, sp
-        if (countEffect > 0) {
-            stats[1] += gasonBuffPercentage * countEffect;
-            stats[3] += gasonBuffPercentage * countEffect;
-        }
-        
-        return stats;
-    }
-    
-    function hasAdvantage(uint32 _aClassId, uint32 _bClassId) constant public returns(bool, bool) {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        
-        uint type1Size = data.getSizeArrayType(ArrayType.CLASS_TYPE, _aClassId);
-        uint type2Size = data.getSizeArrayType(ArrayType.CLASS_TYPE, _bClassId);
-        uint8 aType = 0;
-        uint8 bType = 0;
-        bool aHasAdvantage = false;
-        bool bHasAdvantage = false;
-        for (uint i = 0; i < type1Size; i++) {
-            aType = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(_aClassId), i);
-            for (uint j = 0; j < type2Size; j++) {
-                bType = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(_bClassId), j);
-                if (typeAdvantages[aType] == bType) {
-                    aHasAdvantage = true;
-                }
-                if (typeAdvantages[bType] == aType) {
-                    bHasAdvantage = true;
-                }
-            }
-        }
-        
-        return (aHasAdvantage, bHasAdvantage);
-    }
-    
     function safeDeduct(uint16 a, uint16 b) pure private returns(uint16){
         if (a > b) {
             return a - b;
@@ -585,33 +514,118 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return hpSpecialDeducted;
     }
     
+    function getAncestorBuff(uint32 _classId, SupporterData _support) constant private returns(uint16){
+        EtheremonGateway gateway = EtheremonGateway(worldContract);
+        // check ancestors
+        uint i =0;
+        uint8 countEffect = 0;
+        uint ancestorSize = gateway.getClassPropertySize(_classId, PropertyType.ANCESTOR);
+        if (ancestorSize > 0) {
+            uint32 ancestorClass = 0;
+            for (i=0; i < ancestorSize; i ++) {
+                ancestorClass = gateway.getClassPropertyValue(_classId, PropertyType.ANCESTOR, i);
+                if (ancestorClass == _support.classId1 || ancestorClass == _support.classId2 || ancestorClass == _support.classId3) {
+                    countEffect += 1;
+                }
+            }
+        }
+        return countEffect * ancestorBuffPercentage;
+    }
+    
+    function getGasonSupport(uint8[] _types, SupporterData _sup) constant private returns(uint16 attackSupport) {
+        uint i = 0;
+        uint j = 0;
+        for (i = 0; i < _types.length; i++) {
+             if (_sup.isGason1) {
+                attackSupport += 1;
+                for (j = 0; j < _sup.types1.length; j++) {
+                    if (_types[i] == _sup.types1[j]) {
+                        attackSupport += 1;
+                        break;
+                    }
+                }
+            }
+            if (_sup.isGason2) {
+                attackSupport += 1;
+                for (j = 0; j < _sup.types2.length; j++) {
+                    if (_types[i] == _sup.types2[j]) {
+                        attackSupport += 1;
+                        break;
+                    }
+                }
+            }
+            if (_sup.isGason3) {
+                attackSupport += 1;
+                for (j = 0; j < _sup.types3.length; j++) {
+                    if (_types[i] == _sup.types3[j]) {
+                        attackSupport += 1;
+                        break;
+                    }
+                }
+            }
+            attackSupport = attackSupport * gasonBuffPercentage;
+        }
+    }
+    
+    function getTypeSupport(uint8[] _aTypes, uint8[] _bTypes) constant private returns (uint16 aAttackSupport, uint16 bAttackSupport) {
+        // check types 
+        bool aHasAdvantage;
+        bool bHasAdvantage;
+        for (uint i = 0; i < _aTypes.length; i++) {
+            for (uint j = 0; j < _bTypes.length; j++) {
+                if (typeAdvantages[_aTypes[i]] == _bTypes[j]) {
+                    aHasAdvantage = true;
+                }
+                if (typeAdvantages[_bTypes[j]] == _aTypes[i]) {
+                    bHasAdvantage = true;
+                }
+            }
+        }
+        
+        if (aHasAdvantage)
+            aAttackSupport += typeBuffPercentage;
+        if (bHasAdvantage)
+            bAttackSupport += typeBuffPercentage;
+    }
+    
     function calculateBattleStats(AttackData att) constant private returns(uint32 aExp, uint16[6] aStats, uint32 bExp, uint16[6] bStats) {
         uint32 aClassId = 0;
-        (aClassId, aExp, aStats) = getCurrentStats(att.aa1);
+        (aClassId, aExp, aStats) = getCurrentStats(att.aa);
         uint32 bClassId = 0;
-        (bClassId, bExp, bStats) = getCurrentStats(att.ba1);
+        (bClassId, bExp, bStats) = getCurrentStats(att.ba);
         
-        uint16[6] memory aIncreaseStats;
-        aIncreaseStats = getSupportIncreasingStats(att.aa1, att.as1, att.as2, att.as3);
-        uint16[6] memory bIncreaseStats;
-        bIncreaseStats = getSupportIncreasingStats(att.ba1, att.bs1, att.bs2, att.bs3);
+        uint16 aAncestorBuff = getAncestorBuff(aClassId, att.asup);
+        uint16 bAncestorBuff = getAncestorBuff(bClassId, att.bsup);
         
-        bool aHasAdvantage = false;
-        bool bHasAdvantage = false;
-        (aHasAdvantage, bHasAdvantage) = hasAdvantage(aClassId, bClassId);
-        if (aHasAdvantage) {
-            aIncreaseStats[1] += typeBuffPercentage;
-            aIncreaseStats[3] += typeBuffPercentage;
-        }
-        if (bHasAdvantage) {
-            bIncreaseStats[1] += typeBuffPercentage;
-            bIncreaseStats[3] += typeBuffPercentage;
+        // check types
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        uint i = data.getSizeArrayType(ArrayType.CLASS_TYPE, aClassId);
+        uint8[] memory aTypes = new uint8[](i);
+        for(; i > 0 ; i--) {
+            aTypes[i-1] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(aClassId), i-1);
         }
         
-        for (uint i = 0; i < STAT_COUNT; i++) {
-            aStats[i] += aStats[i] *  aIncreaseStats[i] / 100;
-            bStats[i] += bStats[i] *  bStats[i] / 100;
+        i = data.getSizeArrayType(ArrayType.CLASS_TYPE, bClassId);
+        uint8[] memory bTypes = new uint8[](i);
+        for(; i > 0; i--) {
+            bTypes[i-1] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(bClassId), i-1);
         }
+        
+        // check gasonsupport
+        (att.aAttackSupport, att.bAttackSupport) = getTypeSupport(aTypes, bTypes);
+        att.aAttackSupport += getGasonSupport(aTypes, att.asup);
+        att.bAttackSupport += getGasonSupport(bTypes, att.bsup);
+        
+        for (i = 0; i < STAT_COUNT; i++) {
+            if (i == 1 || i == 3) {
+                aStats[i] += aStats[i] * (aAncestorBuff + att.aAttackSupport) / 100;
+                bStats[i] += bStats[i] * (bAncestorBuff + att.bAttackSupport)/ 100;
+            } else {
+                aStats[i] += aStats[i] * aAncestorBuff / 100;
+                bStats[i] += bStats[i] * bAncestorBuff / 100;
+            }
+        }
+        
     }
     
     function attack(AttackData att) constant private returns(uint32 aExp, uint32 bExp, uint8 ran, bool win) {
@@ -619,7 +633,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint16[6] memory bStats;
         (aExp, aStats, bExp, bStats) = calculateBattleStats(att);
         
-        ran = getRandom(maxRandomRound, 0, lastAttacker);
+        ran = getRandom(maxRandomRound, att.index, lastAttacker);
         uint16 round = 0;
         while (aStats[0] > 0 && bStats[0] > 0) {
             if (aStats[5] > bStats[5]) {
@@ -644,7 +658,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function destroyCastle(uint32 _castleId, bool win) private returns(uint256){
-        if (!win)
+        // if castle win, ignore
+        if (win)
             return 0;
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 totalWin;
@@ -661,7 +676,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return 0;
     }
     
-    function hasValidParam(address trainer, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) constant internal returns(bool) {
+    function hasValidParam(address trainer, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) constant public returns(bool) {
         if (_a1 == 0 || _a2 == 0 || _a3 == 0)
             return false;
         if (_a1 == _a2 || _a1 == _a3 || _a1 == _s1 || _a1 == _s2 || _a1 == _s3)
@@ -675,11 +690,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (_s2 > 0 && (_s2 == _s3))
             return false;
         
-        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
-        if (trade.isOnTrading(_a1) || trade.isOnTrading(_a2) || trade.isOnTrading(_a3) || 
-            trade.isOnTrading(_s1) || trade.isOnTrading(_s2) || trade.isOnTrading(_s3))
-            return false;
-        
         if (!isValidOwner(_a1, trainer) || !isValidOwner(_a2, trainer) || !isValidOwner(_a3, trainer))
             return false;
         if (_s1 > 0 && !isValidOwner(_s1, trainer))
@@ -688,47 +698,100 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             return false;
         if (_s3 > 0 && !isValidOwner(_s3, trainer))
             return false;
+        return true;
     }
     
     // public
-    function setCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requireDataContract 
+    function createCastle(string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requireDataContract 
         requireTradeContract requireCastleContract payable external {
         
         if (!hasValidParam(msg.sender, _a1, _a2, _a3, _s1, _s2, _s3))
             revert();
         
+        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
+        if (trade.isOnTrading(_a1) || trade.isOnTrading(_a2) || trade.isOnTrading(_a3) || 
+            trade.isOnTrading(_s1) || trade.isOnTrading(_s2) || trade.isOnTrading(_s3))
+            revert();
+        
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 castleId;
         uint castleIndex = 0;
-        (castleId, castleIndex) = castle.getCastleBasicInfo(msg.sender);
-        if (castleId == 0) {
-            if (castle.countActiveCastle() > uint(maxActiveCastle))
-                revert();
-            if (msg.value < castleMinFee) {
-                revert();
-            }
-            totalEarn += msg.value - (msg.value * castleDestroyBonus / 100);
-            castleId = castle.setCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3);
-            castle.setCastlePrice(castleId, (msg.value * castleDestroyBonus / 100), uint32(msg.value * minDestroyBattle / castleMinFee));
-        } else {
-            if (msg.value > 0)
-                revert();
-            castle.setCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3);
+        uint256 price = 0;
+        (castleId, castleIndex, price) = castle.getCastleBasicInfo(msg.sender);
+        if (castleId > 0 || castleIndex > 0)
+            revert();
+
+        if (castle.countActiveCastle() > uint(maxActiveCastle))
+            revert();
+        if (msg.value < castleMinFee) {
+            revert();
         }
-        
+        totalEarn += msg.value - (msg.value * castleDestroyBonus / 100);
+        castleId = castle.addCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3, 
+            (msg.value * castleDestroyBonus / 100), uint32(msg.value * minDestroyBattle / castleMinFee));
         EventCreateCastle(msg.sender, castleId);
+    }
+    
+    function renameCastle(uint32 _castleId, string _name) isActive requireCastleContract external {
+        EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
+        uint index;
+        address owner;
+        uint256 price;
+        (index, owner, price) = castle.getCastleBasicInfoById(_castleId);
+        if (owner != msg.sender)
+            revert();
+        castle.renameCastle(_castleId, _name);
     }
     
     function removeCastle(uint32 _castleId) isActive requireCastleContract external {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint index;
         address owner;
-        (index, owner) = castle.getCastleBasicInfoById(_castleId);
+        uint256 price;
+        (index, owner, price) = castle.getCastleBasicInfoById(_castleId);
         if (owner != msg.sender)
             revert();
-        if (index > 0)
+        if (index > 0) {
             castle.removeCastleFromActive(_castleId);
+            totalEarn += price;
+        }
         EventRemoveCastle(_castleId);
+    }
+    
+    function getSupporterInfo(uint64 s1, uint64 s2, uint64 s3) constant public returns(SupporterData sData) {
+        uint temp;
+        uint32 __;
+        uint i = 0;
+        EtheremonGateway gateway = EtheremonGateway(worldContract);
+        (sData.classId1, __, sData.isGason1, temp, temp) = gateway.getObjBattleInfo(s1);
+        (sData.classId2, __, sData.isGason2, temp, temp) = gateway.getObjBattleInfo(s2);
+        (sData.classId3, __, sData.isGason3, temp, temp) = gateway.getObjBattleInfo(s3);
+
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId1);
+       
+        if (sData.isGason1) {
+            sData.types1 = new uint8[](temp);
+            for (i = 0; i < temp; i++) {
+                sData.types1[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId1), i);
+            }
+        }
+        
+        if (sData.isGason2) {
+            temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId2);
+            sData.types2 = new uint8[](temp);
+            for (i = 0; i < temp; i++) {
+                sData.types2[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId2), i);
+            }
+        }
+        
+        if (sData.isGason3) {
+            temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId3);
+            sData.types3 = new uint8[](temp);
+            for (i = 0; i < temp; i++) {
+                sData.types3[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId3), i);
+            }
+        }
     }
     
     function attackCastle(uint32 _castleId, uint64 _aa1, uint64 _aa2, uint64 _aa3, uint64 _as1, uint64 _as2, uint64 _as3) isActive requireDataContract 
@@ -738,75 +801,73 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         BattleLogData memory log;
-        (log.castleIndex, log.castleOwner) = castle.getCastleBasicInfoById(_castleId);
-        if (log.castleId == 0 || log.castleIndex == 0 || log.castleOwner == msg.sender)
+        (log.castleIndex, log.castleOwner, log.castlePrice) = castle.getCastleBasicInfoById(_castleId);
+        if (log.castleIndex == 0 || log.castleOwner == msg.sender)
             revert();
         
         EtheremonGateway gateway = EtheremonGateway(worldContract);
         BattleMonsterData memory b;
         (b.a1, b.a2, b.a3, b.s1, b.s2, b.s3) = castle.getCastleObjInfo(_castleId);
         lastAttacker = msg.sender;
-        // match 1
+
+        // init data
         uint8 countWin = 0;
         AttackData memory att;
-        att.aa1 = _aa1;
-        att.as1 = _as1;
-        att.as2 = _as2;
-        att.as3 = _as3;
-        att.ba1 = b.a1;
-        att.bs1 = b.s1;
-        att.bs2 = b.s2;
+        att.asup = getSupporterInfo(b.s1, b.s2, b.s3);
+        att.bsup = getSupporterInfo(_as1, _as2, _as3);
         
+        att.index = 0;
+        att.aa = b.a1;
+        att.ba = _aa1;
         (log.monsterExp[0], log.monsterExp[3], log.randoms[0], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa1, getGainExp(log.monsterExp[3], log.monsterExp[0], log.win, true));
-        gateway.increaseMonsterExp(att.ba1, getGainExp(log.monsterExp[0], log.monsterExp[3], !log.win, false));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[0], log.monsterExp[3], log.win, false));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[3], log.monsterExp[0], !log.win, true));
         if (log.win)
             countWin += 1;
         
-        att.aa1 = _aa2;
-        att.ba1 = b.a2;
+        
+        att.index = 1;
+        att.aa = b.a2;
+        att.ba = _aa2;
         (log.monsterExp[1], log.monsterExp[4], log.randoms[1], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa1, getGainExp(log.monsterExp[4], log.monsterExp[1], log.win, true));
-        gateway.increaseMonsterExp(att.ba1, getGainExp(log.monsterExp[1], log.monsterExp[4], !log.win, false));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[1], log.monsterExp[4], log.win, false));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[4], log.monsterExp[1], !log.win, true));
         if (log.win)
             countWin += 1;   
 
-        att.aa1 = _aa3;
-        att.ba1 = b.a3;
+        att.index = 2;
+        att.aa = b.a3;
+        att.ba = _aa3;
         (log.monsterExp[2], log.monsterExp[5], log.randoms[2], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa1, getGainExp(log.monsterExp[5], log.monsterExp[2], log.win, true));
-        gateway.increaseMonsterExp(att.ba1, getGainExp(log.monsterExp[2], log.monsterExp[5], !log.win, false));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[2], log.monsterExp[5], log.win, false));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[5], log.monsterExp[2], !log.win, true));
         if (log.win)
             countWin += 1; 
         
-        log.castleBonus = destroyCastle(_castleId, countWin>=2);
-        log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], !(countWin>=2), log.castleBonus);
-        castle.addBattleMonsterLog(log.battleId, b.a1, log.monsterExp[3], 0);
-        castle.addBattleMonsterLog(log.battleId, b.a2, log.monsterExp[4], 0);
-        castle.addBattleMonsterLog(log.battleId, b.a3, log.monsterExp[5], 0);
-        castle.addBattleMonsterLog(log.battleId, b.s1, 0, 0);
-        castle.addBattleMonsterLog(log.battleId, b.s2, 0, 0);
-        castle.addBattleMonsterLog(log.battleId, b.s3, 0, 0);
+        log.castleBonus = destroyCastle(_castleId, countWin>1);
+        if (countWin>1) {
+            log.result = BattleResult.CASTLE_WIN;
+        } else {
+            if (log.castleBonus > 0) {
+                log.result = BattleResult.CASTLE_DESTROYED;
+            } else {
+                log.result = BattleResult.CASTLE_LOSE;
+            }
+        }
         
-        castle.addBattleMonsterLog(log.battleId, _aa1, log.monsterExp[0], 0);
-        castle.addBattleMonsterLog(log.battleId, _aa2, log.monsterExp[1], 0);
-        castle.addBattleMonsterLog(log.battleId, _aa3, log.monsterExp[2], 0);
-        castle.addBattleMonsterLog(log.battleId, _as1, 0, 0);
-        castle.addBattleMonsterLog(log.battleId, _as2, 0, 0);
-        castle.addBattleMonsterLog(log.battleId, _as3, 0, 0);
-
+        log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], 
+            log.result, log.monsterExp[0], log.monsterExp[1], log.monsterExp[2]);
+        castle.addBattleLogMonsterInfo(log.battleId, _aa1, _aa2, _aa3, _as1, _as2, _as3, log.monsterExp[3], log.monsterExp[4], log.monsterExp[5]);
+        
         if (log.castleBonus  > 0) {
             // send bonus if smart contract has enough money 
             if (this.balance > log.castleBonus) {
                 // no guarantee
-                if(msg.sender.send(log.castleBonus ))
-                    EventDestroyCastle(_castleId, msg.sender, true);
-                else
-                    EventDestroyCastle(_castleId, msg.sender, false);
+                msg.sender.transfer(log.castleBonus);
             }
         }
         
-        EventAttackCastle(msg.sender, _castleId, countWin>=2);
+        EventAttackCastle(msg.sender, _castleId, uint8(log.result));
     }
     
 }
