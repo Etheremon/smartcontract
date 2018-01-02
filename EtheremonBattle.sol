@@ -259,13 +259,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // global variable
     mapping(uint8 => uint8) typeAdvantages;
-    uint8 public ancestorBuffPercentage = 4;
-    uint8 public gasonBuffPercentage = 8;
+    uint8 public ancestorBuffPercentage = 10;
+    uint8 public gasonBuffPercentage = 10;
     uint8 public typeBuffPercentage = 20;
-    uint256 public castleMinFee = 0.2 ether;
+    uint256 public castleMinFee = 0.08 ether;
     uint8 public castleDestroyBonus = 50;// percentage
     uint8 public maxLevel = 100;
-    uint16 public maxActiveCastle = 30;
+    uint16 public maxActiveCastle = 50;
     uint8 public maxRandomRound = 5;
     uint8 public minDestroyBattle = 10; // battles
     uint8 public minDestroyRate = 40; // percentage
@@ -384,8 +384,12 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function getGainExp(uint32 _exp1, uint32 _exp2, bool _win, bool _isAttacker) view public returns(uint32){
-        uint8 level = getLevel(_exp1);
-        uint8 halfLevel1 = level/2;
+        uint8 level = getLevel(_exp2);
+        uint8 level2 = getLevel(_exp1);
+        uint8 halfLevel1 = level;
+        if (halfLevel1 > level2 + 3)
+            halfLevel1 = level2;
+        halfLevel1 = halfLevel1/2;
         uint32 gainExp = 1;
         uint256 rate = (21 ** uint256(halfLevel1)) * 1000 / (20 ** uint256(halfLevel1));
         rate = rate * rate;
@@ -395,15 +399,15 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             if (_isAttacker) {
                 gainExp = uint32(30 * rate);
             } else {
-                gainExp = uint32(15 * rate);
+                gainExp = uint32(20 * rate);
             }
         } else {
-            gainExp = uint32(6 * rate);
+            gainExp = uint32(10 * rate);
         }
         
-        uint8 level2 = getLevel(_exp2);
-        if (halfLevel1* 2 > level2) {
-            gainExp = gainExp * (halfLevel1 * 2 - level2) * 112 / 100;
+        
+        if (level > level2) {
+            gainExp = gainExp * (level - level2) * 112 / 100;
         }
         return gainExp;
     }
@@ -415,14 +419,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
      
         return (obj.exp, getLevel(obj.exp));
-    }
-    
-    function getMonsterClassId(uint64 _objId) constant public returns(uint32) {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        MonsterObjAcc memory obj;
-        uint32 _ = 0;
-        (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
-        return obj.classId;
     }
     
     function getMonsterCP(uint64 _objId) constant external returns(uint64) {
@@ -482,12 +478,12 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (baseSize != STAT_COUNT) {
             for(i=0; i < STAT_COUNT; i+=1) {
                 stats[i] += data.getElementInArrayType(ArrayType.STAT_START, uint64(classId), i);
-                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level));
+                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
             }
         } else {
             for(i=0; i < STAT_COUNT; i+=1) {
                 stats[i] += data.getElementInArrayType(ArrayType.STAT_BASE, _objId, i);
-                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level));
+                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
             }
         }
         return (classId, exp, stats);
@@ -537,7 +533,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint j = 0;
         for (i = 0; i < _types.length; i++) {
              if (_sup.isGason1) {
-                attackSupport += 1;
                 for (j = 0; j < _sup.types1.length; j++) {
                     if (_types[i] == _sup.types1[j]) {
                         attackSupport += 1;
@@ -546,7 +541,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
                 }
             }
             if (_sup.isGason2) {
-                attackSupport += 1;
                 for (j = 0; j < _sup.types2.length; j++) {
                     if (_types[i] == _sup.types2[j]) {
                         attackSupport += 1;
@@ -555,7 +549,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
                 }
             }
             if (_sup.isGason3) {
-                attackSupport += 1;
                 for (j = 0; j < _sup.types3.length; j++) {
                     if (_types[i] == _sup.types3[j]) {
                         attackSupport += 1;
@@ -594,9 +587,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint32 bClassId = 0;
         (bClassId, bExp, bStats) = getCurrentStats(att.ba);
         
-        uint16 aAncestorBuff = getAncestorBuff(aClassId, att.asup);
-        uint16 bAncestorBuff = getAncestorBuff(bClassId, att.bsup);
-        
         // check types
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint i = data.getSizeArrayType(ArrayType.CLASS_TYPE, aClassId);
@@ -613,18 +603,23 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
         // check gasonsupport
         (att.aAttackSupport, att.bAttackSupport) = getTypeSupport(aTypes, bTypes);
-        att.aAttackSupport += getGasonSupport(aTypes, att.asup);
-        att.bAttackSupport += getGasonSupport(bTypes, att.bsup);
+        att.aAttackSupport += getAncestorBuff(aClassId, att.asup);
+        att.bAttackSupport += getAncestorBuff(bClassId, att.bsup);
         
-        for (i = 0; i < STAT_COUNT; i++) {
-            if (i == 1 || i == 3) {
-                aStats[i] += aStats[i] * (aAncestorBuff + att.aAttackSupport) / 100;
-                bStats[i] += bStats[i] * (bAncestorBuff + att.bAttackSupport)/ 100;
-            } else {
-                aStats[i] += aStats[i] * aAncestorBuff / 100;
-                bStats[i] += bStats[i] * bAncestorBuff / 100;
-            }
-        }
+        uint16 aDefenseBuff = getGasonSupport(aTypes, att.asup);
+        uint16 bDefenseBuff = getGasonSupport(bTypes, att.bsup);
+        
+        // add attack
+        aStats[1] += aStats[1] * att.aAttackSupport;
+        aStats[3] += aStats[3] * att.aAttackSupport;
+        bStats[1] += bStats[1] * att.aAttackSupport;
+        bStats[3] += bStats[3] * att.aAttackSupport;
+        
+        // add offense
+        aStats[2] += aStats[2] * aDefenseBuff;
+        aStats[4] += aStats[4] * aDefenseBuff;
+        bStats[2] += bStats[2] * bDefenseBuff;
+        bStats[4] += bStats[4] * bDefenseBuff;
         
     }
     
