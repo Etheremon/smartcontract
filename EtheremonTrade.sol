@@ -251,9 +251,9 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         gen0Config[14] = Gen0Config(14, 0.2 ether, 0.002 ether, 338);
         gen0Config[15] = Gen0Config(15, 0.2 ether, 0.002 ether, 341);
         gen0Config[16] = Gen0Config(16, 0.35 ether, 0.0035 ether, 384);
-        gen0Config[17] = Gen0Config(17, 0.1 ether, 0.001 ether, 305); 
+        gen0Config[17] = Gen0Config(17, 1 ether, 0.01 ether, 305); 
         gen0Config[18] = Gen0Config(18, 0.1 ether, 0.001 ether, 427);
-        gen0Config[19] = Gen0Config(19, 0.1 ether, 0.001 ether, 304);
+        gen0Config[19] = Gen0Config(19, 1 ether, 0.01 ether, 304);
         gen0Config[20] = Gen0Config(20, 0.4 ether, 0.005 ether, 82);
         gen0Config[21] = Gen0Config(21, 1, 1, 123);
         gen0Config[22] = Gen0Config(22, 0.2 ether, 0.001 ether, 468);

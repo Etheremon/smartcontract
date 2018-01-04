@@ -577,16 +577,22 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         for (i = 0; i < cacheClasses[_classId].types.length; i++) {
             classType = cacheClasses[_classId].types[i];
              if (_sup.isGason1) {
-                if (classType == _sup.type1)
+                if (classType == _sup.type1) {
                     attackSupport += 1;
+                    continue;
+                }
             }
             if (_sup.isGason2) {
-                if (classType == _sup.type2)
+                if (classType == _sup.type2) {
                     attackSupport += 1;
+                    continue;
+                }
             }
             if (_sup.isGason3) {
-                if (classType == _sup.type3)
+                if (classType == _sup.type3) {
                     attackSupport += 1;
+                    continue;
+                }
             }
             attackSupport = attackSupport * gasonBuffPercentage;
         }
@@ -681,7 +687,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint32 minBattle;
         (totalWin, totalLose, price, minBattle) = castle.getCastleWinLose(_castleId);
         if (totalWin + totalLose >= minBattle) {
-            if (totalWin * 100 / totalLose < minDestroyRate) {
+            if (totalWin * 100 / (totalLose + totalWin)  < minDestroyRate) {
                 castle.removeCastleFromActive(_castleId);
                 return price;
             }
@@ -768,6 +774,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         if (index > 0) {
             castle.removeCastleFromActive(_castleId);
+            castle.withdrawEther(address(this), price);
             totalEarn += price;
         }
         EventRemoveCastle(_castleId);
