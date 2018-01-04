@@ -114,6 +114,12 @@ contract EtheremonEnum {
         CASTLE_LOSE,
         CASTLE_DESTROYED
     }
+    
+    enum CacheClassInfoType {
+        CLASS_TYPE,
+        CLASS_STEP,
+        CLASS_ANCESTOR
+    }
 }
 
 contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
@@ -247,6 +253,12 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         bool win;
         BattleResult result;
     }
+    
+    struct CacheClassInfo {
+        uint8[] types;
+        uint8[] steps;
+        uint32[] ancestors;
+    }
 
     // event
     event EventCreateCastle(address indexed owner, uint32 castleId);
@@ -261,6 +273,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // global variable
     mapping(uint8 => uint8) typeAdvantages;
+    mapping(uint32 => CacheClassInfo) cacheClasses;
     uint8 public ancestorBuffPercentage = 10;
     uint8 public gasonBuffPercentage = 10;
     uint8 public typeBuffPercentage = 20;
@@ -329,8 +342,39 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         typeAdvantages[18] = 4;
     }
     
-    function setTypeAdvantage(uint8 type1, uint8 type2) onlyModerators external {
-        typeAdvantages[type1] = type2;
+    function setTypeAdvantage(uint8 _type1, uint8 _type2) onlyModerators external {
+        typeAdvantages[_type1] = _type2;
+    }
+    
+    function setCacheClassInfo(uint32 _classId) onlyModerators requireDataContract requireWorldContract external {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+         EtheremonGateway gateway = EtheremonGateway(worldContract);
+        uint i = 0;
+        CacheClassInfo storage classInfo = cacheClasses[_classId];
+
+        // add type
+        i = data.getSizeArrayType(ArrayType.CLASS_TYPE, uint64(_classId));
+        uint8[] memory aTypes = new uint8[](i);
+        for(; i > 0 ; i--) {
+            aTypes[i-1] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(_classId), i-1);
+        }
+        classInfo.types = aTypes;
+
+        // add steps
+        i = data.getSizeArrayType(ArrayType.STAT_STEP, uint64(_classId));
+        uint8[] memory steps = new uint8[](i);
+        for(; i > 0 ; i--) {
+            steps[i-1] = data.getElementInArrayType(ArrayType.STAT_STEP, uint64(_classId), i-1);
+        }
+        classInfo.steps = steps;
+        
+        // add ancestor
+        i = gateway.getClassPropertySize(_classId, PropertyType.ANCESTOR);
+        uint32[] memory ancestors = new uint32[](i);
+        for(; i > 0 ; i--) {
+            ancestors[i-1] = gateway.getClassPropertyValue(_classId, PropertyType.ANCESTOR, i-1);
+        }
+        classInfo.ancestors = ancestors;
     }
      
     function withdrawEther(address _sendTo, uint _amount) onlyModerators external {
@@ -366,6 +410,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // public 
+    function getCacheClassSize(uint32 _classId) constant public returns(uint, uint, uint) {
+        CacheClassInfo storage classInfo = cacheClasses[_classId];
+        return (classInfo.types.length, classInfo.steps.length, classInfo.ancestors.length);
+    }
+    
     function getRandom(uint8 maxRan, uint8 index, address priAddress) constant public returns(uint8) {
         uint256 genNum = uint256(block.blockhash(block.number-1)) + uint256(priAddress);
         for (uint8 i = 0; i < index && i < 6; i ++) {
@@ -479,7 +528,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint8 level = getLevel(exp);
         for(i=0; i < STAT_COUNT; i+=1) {
             stats[i] += data.getElementInArrayType(ArrayType.STAT_BASE, _objId, i);
-            stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
+            stats[i] += uint16(safeMult(cacheClasses[classId].steps[i], level*3));
         }
         return (classId, exp, stats);
     }
@@ -506,15 +555,14 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function getAncestorBuff(uint32 _classId, SupporterData _support) constant private returns(uint16){
-        EtheremonGateway gateway = EtheremonGateway(worldContract);
         // check ancestors
         uint i =0;
         uint8 countEffect = 0;
-        uint ancestorSize = gateway.getClassPropertySize(_classId, PropertyType.ANCESTOR);
+        uint ancestorSize = cacheClasses[_classId].ancestors.length;
         if (ancestorSize > 0) {
             uint32 ancestorClass = 0;
             for (i=0; i < ancestorSize; i ++) {
-                ancestorClass = gateway.getClassPropertyValue(_classId, PropertyType.ANCESTOR, i);
+                ancestorClass = cacheClasses[_classId].ancestors[i];
                 if (ancestorClass == _support.classId1 || ancestorClass == _support.classId2 || ancestorClass == _support.classId3) {
                     countEffect += 1;
                 }
@@ -523,35 +571,37 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return countEffect * ancestorBuffPercentage;
     }
     
-    function getGasonSupport(uint8[] _types, SupporterData _sup) constant private returns(uint16 attackSupport) {
+    function getGasonSupport(uint32 _classId, SupporterData _sup) constant private returns(uint16 attackSupport) {
         uint i = 0;
-        for (i = 0; i < _types.length; i++) {
+        uint8 classType = 0;
+        for (i = 0; i < cacheClasses[_classId].types.length; i++) {
+            classType = cacheClasses[_classId].types[i];
              if (_sup.isGason1) {
-                if (_types[i] == _sup.type1)
+                if (classType == _sup.type1)
                     attackSupport += 1;
             }
             if (_sup.isGason2) {
-                if (_types[i] == _sup.type2)
+                if (classType == _sup.type2)
                     attackSupport += 1;
             }
             if (_sup.isGason3) {
-                if (_types[i] == _sup.type3)
+                if (classType == _sup.type3)
                     attackSupport += 1;
             }
             attackSupport = attackSupport * gasonBuffPercentage;
         }
     }
     
-    function getTypeSupport(uint8[] _aTypes, uint8[] _bTypes) constant private returns (uint16 aAttackSupport, uint16 bAttackSupport) {
+    function getTypeSupport(uint32 _aClassId, uint32 _bClassId) constant private returns (uint16 aAttackSupport, uint16 bAttackSupport) {
         // check types 
         bool aHasAdvantage;
         bool bHasAdvantage;
-        for (uint i = 0; i < _aTypes.length; i++) {
-            for (uint j = 0; j < _bTypes.length; j++) {
-                if (typeAdvantages[_aTypes[i]] == _bTypes[j]) {
+        for (uint i = 0; i < cacheClasses[_aClassId].types.length; i++) {
+            for (uint j = 0; j < cacheClasses[_bClassId].types.length; j++) {
+                if (typeAdvantages[cacheClasses[_aClassId].types[i]] == cacheClasses[_bClassId].types[j]) {
                     aHasAdvantage = true;
                 }
-                if (typeAdvantages[_bTypes[j]] == _aTypes[i]) {
+                if (typeAdvantages[cacheClasses[_bClassId].types[j]] == cacheClasses[_aClassId].types[i]) {
                     bHasAdvantage = true;
                 }
             }
@@ -569,27 +619,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint32 bClassId = 0;
         (bClassId, bExp, bStats) = getCurrentStats(att.ba);
         
-        // check types
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        uint i = data.getSizeArrayType(ArrayType.CLASS_TYPE, aClassId);
-        uint8[] memory aTypes = new uint8[](i);
-        for(; i > 0 ; i--) {
-            aTypes[i-1] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(aClassId), i-1);
-        }
-        
-        i = data.getSizeArrayType(ArrayType.CLASS_TYPE, bClassId);
-        uint8[] memory bTypes = new uint8[](i);
-        for(; i > 0; i--) {
-            bTypes[i-1] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(bClassId), i-1);
-        }
-        
         // check gasonsupport
-        (att.aAttackSupport, att.bAttackSupport) = getTypeSupport(aTypes, bTypes);
+        (att.aAttackSupport, att.bAttackSupport) = getTypeSupport(aClassId, bClassId);
         att.aAttackSupport += getAncestorBuff(aClassId, att.asup);
         att.bAttackSupport += getAncestorBuff(bClassId, att.bsup);
         
-        uint16 aDefenseBuff = getGasonSupport(aTypes, att.asup);
-        uint16 bDefenseBuff = getGasonSupport(bTypes, att.bsup);
+        uint16 aDefenseBuff = getGasonSupport(aClassId, att.asup);
+        uint16 bDefenseBuff = getGasonSupport(bClassId, att.bsup);
         
         // add attack
         aStats[1] += aStats[1] * att.aAttackSupport;
@@ -746,8 +782,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         (sData.classId3, __, sData.isGason3, temp, temp) = gateway.getObjBattleInfo(s3);
 
         EtheremonDataBase data = EtheremonDataBase(dataContract);
-        temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId1);
-       
         if (sData.isGason1) {
             sData.type1 = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId1), 0);
         }
