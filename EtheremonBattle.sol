@@ -164,6 +164,8 @@ contract EtheremonCastleContract is EtheremonEnum, BasicAccessControl{
     function isOnCastle(uint32 _castleId, uint64 _objId) constant external returns(bool);
     function getCastleWinLose(uint32 _castleId) constant external returns(uint32, uint32, uint256, uint32);
 
+    function () payable public;
+    function withdrawEther(address _sendTo, uint _amount) onlyModerators public returns(ResultCode);
     function addCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, 
         uint256 _price, uint32 _minBattle) onlyModerators external returns(uint32 currentCastleId);
     function renameCastle(uint32 _castleId, string _name) onlyModerators external;
@@ -209,13 +211,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     struct SupporterData {
         uint32 classId1;
         bool isGason1;
-        uint8[] types1;
+        uint8 type1;
         uint32 classId2;
         bool isGason2;
-        uint8[] types2;
+        uint8 type2;
         uint32 classId3;
         bool isGason3;
-        uint8[] types3;
+        uint8 type3;
     }
 
     struct AttackData {
@@ -387,13 +389,15 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint8 level = getLevel(_exp2);
         uint8 level2 = getLevel(_exp1);
         uint8 halfLevel1 = level;
-        if (halfLevel1 > level2 + 3)
-            halfLevel1 = level2;
-        halfLevel1 = halfLevel1/2;
+        if (level > level2 + 3) {
+            halfLevel1 = (level2 + 3) / 2;
+        } else {
+            halfLevel1 = level / 2;
+        }
         uint32 gainExp = 1;
         uint256 rate = (21 ** uint256(halfLevel1)) * 1000 / (20 ** uint256(halfLevel1));
         rate = rate * rate;
-        if (level > 2 * halfLevel1) rate = rate * 21 / 20;
+        if ((level > level2 + 3 && level2 + 3 > 2 * halfLevel1) || (level <= level2 + 3 && level > 2 * halfLevel1)) rate = rate * 21 / 20;
         rate = rate / 1000000;
         if (_win) {
             if (_isAttacker) {
@@ -405,9 +409,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             gainExp = uint32(10 * rate);
         }
         
-        
-        if (level > level2) {
-            gainExp = gainExp * (level - level2) * 112 / 100;
+        if (level2 >= level + 5) {
+            gainExp /= uint32(2) ** ((level2 - level) / 5);
         }
         return gainExp;
     }
@@ -474,17 +477,9 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
         uint i = 0;
         uint8 level = getLevel(exp);
-        uint baseSize = data.getSizeArrayType(ArrayType.STAT_BASE, _objId);
-        if (baseSize != STAT_COUNT) {
-            for(i=0; i < STAT_COUNT; i+=1) {
-                stats[i] += data.getElementInArrayType(ArrayType.STAT_START, uint64(classId), i);
-                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
-            }
-        } else {
-            for(i=0; i < STAT_COUNT; i+=1) {
-                stats[i] += data.getElementInArrayType(ArrayType.STAT_BASE, _objId, i);
-                stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
-            }
+        for(i=0; i < STAT_COUNT; i+=1) {
+            stats[i] += data.getElementInArrayType(ArrayType.STAT_BASE, _objId, i);
+            stats[i] += uint16(safeMult(data.getElementInArrayType(ArrayType.STAT_STEP, uint64(classId), i), level*3));
         }
         return (classId, exp, stats);
     }
@@ -530,31 +525,18 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function getGasonSupport(uint8[] _types, SupporterData _sup) constant private returns(uint16 attackSupport) {
         uint i = 0;
-        uint j = 0;
         for (i = 0; i < _types.length; i++) {
              if (_sup.isGason1) {
-                for (j = 0; j < _sup.types1.length; j++) {
-                    if (_types[i] == _sup.types1[j]) {
-                        attackSupport += 1;
-                        break;
-                    }
-                }
+                if (_types[i] == _sup.type1)
+                    attackSupport += 1;
             }
             if (_sup.isGason2) {
-                for (j = 0; j < _sup.types2.length; j++) {
-                    if (_types[i] == _sup.types2[j]) {
-                        attackSupport += 1;
-                        break;
-                    }
-                }
+                if (_types[i] == _sup.type2)
+                    attackSupport += 1;
             }
             if (_sup.isGason3) {
-                for (j = 0; j < _sup.types3.length; j++) {
-                    if (_types[i] == _sup.types3[j]) {
-                        attackSupport += 1;
-                        break;
-                    }
-                }
+                if (_types[i] == _sup.type3)
+                    attackSupport += 1;
             }
             attackSupport = attackSupport * gasonBuffPercentage;
         }
@@ -721,9 +703,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (msg.value < castleMinFee) {
             revert();
         }
-        totalEarn += msg.value - (msg.value * castleDestroyBonus / 100);
+        price = msg.value * castleDestroyBonus / 100;
+        totalEarn += msg.value - price;
         castleId = castle.addCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3, 
-            (msg.value * castleDestroyBonus / 100), uint32(msg.value * minDestroyBattle / castleMinFee));
+            price, uint32(msg.value * minDestroyBattle / castleMinFee));
+        castle.transfer(price);
         EventCreateCastle(msg.sender, castleId);
     }
     
@@ -756,7 +740,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     function getSupporterInfo(uint64 s1, uint64 s2, uint64 s3) constant public returns(SupporterData sData) {
         uint temp;
         uint32 __;
-        uint i = 0;
         EtheremonGateway gateway = EtheremonGateway(worldContract);
         (sData.classId1, __, sData.isGason1, temp, temp) = gateway.getObjBattleInfo(s1);
         (sData.classId2, __, sData.isGason2, temp, temp) = gateway.getObjBattleInfo(s2);
@@ -766,26 +749,15 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId1);
        
         if (sData.isGason1) {
-            sData.types1 = new uint8[](temp);
-            for (i = 0; i < temp; i++) {
-                sData.types1[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId1), i);
-            }
+            sData.type1 = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId1), 0);
         }
         
         if (sData.isGason2) {
-            temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId2);
-            sData.types2 = new uint8[](temp);
-            for (i = 0; i < temp; i++) {
-                sData.types2[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId2), i);
-            }
+            sData.type2 = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId2), 0);
         }
         
         if (sData.isGason3) {
-            temp = data.getSizeArrayType(ArrayType.CLASS_TYPE, sData.classId3);
-            sData.types3 = new uint8[](temp);
-            for (i = 0; i < temp; i++) {
-                sData.types3[i] = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId3), i);
-            }
+            sData.type3 = data.getElementInArrayType(ArrayType.CLASS_TYPE, uint64(sData.classId3), 0);
         }
     }
     
@@ -855,11 +827,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castle.addBattleLogMonsterInfo(log.battleId, _aa1, _aa2, _aa3, _as1, _as2, _as3, log.monsterExp[3], log.monsterExp[4], log.monsterExp[5]);
         
         if (log.castleBonus  > 0) {
-            // send bonus if smart contract has enough money 
-            if (this.balance > log.castleBonus) {
-                // no guarantee
-                msg.sender.transfer(log.castleBonus);
-            }
+            castle.withdrawEther(msg.sender, log.castleBonus);
         }
         
         EventAttackCastle(msg.sender, _castleId, uint8(log.result));

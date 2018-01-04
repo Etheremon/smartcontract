@@ -82,7 +82,29 @@ contract BasicAccessControl {
     }
 }
 
-contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
+contract EtheremonEnum {
+
+    enum ResultCode {
+        SUCCESS,
+        ERROR_CLASS_NOT_FOUND,
+        ERROR_LOW_BALANCE,
+        ERROR_SEND_FAIL,
+        ERROR_NOT_TRAINER,
+        ERROR_NOT_ENOUGH_MONEY,
+        ERROR_INVALID_AMOUNT
+    }
+    
+    enum ArrayType {
+        CLASS_TYPE,
+        STAT_STEP,
+        STAT_START,
+        STAT_BASE,
+        OBJ_SKILL
+    }
+}
+
+
+contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     enum BattleResult {
         CASTLE_WIN,
         CASTLE_LOSE,
@@ -137,6 +159,20 @@ contract EtheremonCastleBattle is BasicAccessControl, SafeMath {
     AFTER THE SYSTEM IS STABLE, WE WILL REMOVE OWNER OF THIS SMART CONTRACT AND ONLY KEEP ONE MODERATOR WHICH IS ETHEREMON BATTLE CONTRACT.
     HENCE, THE DECENTRALIZED ATTRIBUTION IS GUARANTEED.
     */
+    
+    // write access
+    function () payable public {
+    }
+    
+    // This method is designed to allow EtheremonBattle updateble. After the EtheremonBattle is stable, owner will be removed and moderators are fixed.
+    function withdrawEther(address _sendTo, uint _amount) onlyModerators public returns(ResultCode) {
+        if (_amount > this.balance) {
+            return ResultCode.ERROR_INVALID_AMOUNT;
+        }
+        
+        _sendTo.transfer(_amount);
+        return ResultCode.SUCCESS;
+    }
     
     function addCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, 
         uint256 _price, uint32 _minBattle) onlyModerators external returns(uint32 currentCastleId){
