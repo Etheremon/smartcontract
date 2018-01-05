@@ -455,7 +455,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return minIndex;
     }
     
-    function getGainExp(uint32 _exp1, uint32 _exp2, bool _win, bool _isAttacker) view public returns(uint32){
+    function getGainExp(uint32 _exp1, uint32 _exp2, bool _win) view public returns(uint32){
         uint8 level = getLevel(_exp2);
         uint8 level2 = getLevel(_exp1);
         uint8 halfLevel1 = level;
@@ -469,11 +469,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         rate = rate * rate;
         if ((level > level2 + 3 && level2 + 3 > 2 * halfLevel1) || (level <= level2 + 3 && level > 2 * halfLevel1)) rate = rate * 21 / 20;
         if (_win) {
-            if (_isAttacker) {
-                gainExp = uint32(30 * rate / 1000000);
-            } else {
-                gainExp = uint32(20 * rate / 1000000);
-            }
+            gainExp = uint32(30 * rate / 1000000);
         } else {
             gainExp = uint32(10 * rate / 1000000);
         }
@@ -846,8 +842,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a1;
         att.ba = _aa1;
         (log.monsterExp[0], log.monsterExp[3], log.randoms[0], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[0], log.monsterExp[3], log.win, false));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[3], log.monsterExp[0], !log.win, true));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[0], log.monsterExp[3], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[3], log.monsterExp[0], !log.win));
         if (log.win)
             countWin += 1;
         
@@ -856,8 +852,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a2;
         att.ba = _aa2;
         (log.monsterExp[1], log.monsterExp[4], log.randoms[1], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[1], log.monsterExp[4], log.win, false));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[4], log.monsterExp[1], !log.win, true));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[1], log.monsterExp[4], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[4], log.monsterExp[1], !log.win));
         if (log.win)
             countWin += 1;   
 
@@ -865,8 +861,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a3;
         att.ba = _aa3;
         (log.monsterExp[2], log.monsterExp[5], log.randoms[2], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[2], log.monsterExp[5], log.win, false));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[5], log.monsterExp[2], !log.win, true));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[2], log.monsterExp[5], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[5], log.monsterExp[2], !log.win));
         if (log.win)
             countWin += 1; 
         
