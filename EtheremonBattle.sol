@@ -274,6 +274,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     // global variable
     mapping(uint8 => uint8) typeAdvantages;
     mapping(uint32 => CacheClassInfo) cacheClasses;
+    mapping(uint8 => uint32) levelExps;
     uint8 public ancestorBuffPercentage = 10;
     uint8 public gasonBuffPercentage = 10;
     uint8 public typeBuffPercentage = 20;
@@ -281,7 +282,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public castleDestroyBonus = 50;// percentage
     uint8 public maxLevel = 100;
     uint16 public maxActiveCastle = 50;
-    uint8 public maxRandomRound = 5;
+    uint8 public maxRandomRound = 6;
     
     uint8 public winBrickReturn = 8;
     uint256 public brickPrice = 0.008 ether;
@@ -410,6 +411,18 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castleDestroyBonus = _castleDestroyBonus;
     }
     
+    function genLevelExp() onlyModerators external {
+        uint8 level = 1;
+        uint32 requirement = 100;
+        uint32 sum = requirement;
+        while(level <= 100) {
+            levelExps[level] = sum;
+            level += 1;
+            requirement = (requirement * 11) / 10 + 5;
+            sum += requirement;
+        }
+    }
+    
     // public 
     function getCacheClassSize(uint32 _classId) constant public returns(uint, uint, uint) {
         CacheClassInfo storage classInfo = cacheClasses[_classId];
@@ -425,14 +438,18 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function getLevel(uint32 exp) view public returns (uint8) {
-        uint8 level = 1;
-        uint32 requirement = maxLevel;
-        while(level < maxLevel && exp > requirement) {
-            exp -= requirement;
-            level += 1;
-            requirement = requirement * 11 / 10 + 5;
+        uint8 minIndex = 1;
+        uint8 maxIndex = 100;
+        uint8 currentIndex;
+     
+        while (minIndex < maxIndex) {
+            currentIndex = (minIndex + maxIndex) / 2;
+            if (exp < levelExps[currentIndex])
+                maxIndex = currentIndex - 1;
+            else
+                minIndex = currentIndex + 1;
         }
-        return level;
+        return minIndex;
     }
     
     function getGainExp(uint32 _exp1, uint32 _exp2, bool _win, bool _isAttacker) view public returns(uint32){
@@ -655,7 +672,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
         ran = getRandom(maxRandomRound, att.index, lastAttacker);
         uint16 round = 0;
-        while (aStats[0] > 0 && bStats[0] > 0) {
+        while (round < maxRandomRound && aStats[0] > 0 && bStats[0] > 0) {
             if (aStats[5] > bStats[5]) {
                 if (round % 2 == 0) {
                     // a attack 
@@ -687,7 +704,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint256 price;
         uint32 brickNumber;
         (totalWin, totalLose, price, brickNumber) = castle.getCastleWinLose(_castleId);
-        if (brickNumber + totalWin/winBrickReturn - totalLose <= 0) {
+        if (brickNumber + totalWin/winBrickReturn - totalLose <= 1) {
             castle.removeCastleFromActive(_castleId);
             return price;
         }
