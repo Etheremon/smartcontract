@@ -562,8 +562,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function calHpDeducted(uint16 _attack, uint16 _specialAttack, uint16 _defense, uint16 _specialDefense, bool _lucky) view public returns(uint16){
         if (_lucky) {
-            _attack = _attack * 2;
-            _specialAttack = _specialAttack * 2;
+            _attack = _attack * 13 / 10;
+            _specialAttack = _specialAttack * 13 / 10;
         }
         uint16 hpDeducted = safeDeduct(_attack, _defense * 3 /4);
         uint16 hpSpecialDeducted = safeDeduct(_specialAttack, _specialDefense* 3 / 4);
