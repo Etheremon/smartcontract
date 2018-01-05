@@ -468,15 +468,14 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint256 rate = (21 ** uint256(halfLevel1)) * 1000 / (20 ** uint256(halfLevel1));
         rate = rate * rate;
         if ((level > level2 + 3 && level2 + 3 > 2 * halfLevel1) || (level <= level2 + 3 && level > 2 * halfLevel1)) rate = rate * 21 / 20;
-        rate = rate / 1000000;
         if (_win) {
             if (_isAttacker) {
-                gainExp = uint32(30 * rate);
+                gainExp = uint32(30 * rate / 1000000);
             } else {
-                gainExp = uint32(20 * rate);
+                gainExp = uint32(20 * rate / 1000000);
             }
         } else {
-            gainExp = uint32(10 * rate);
+            gainExp = uint32(10 * rate / 1000000);
         }
         
         if (level2 >= level + 5) {
