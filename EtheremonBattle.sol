@@ -278,7 +278,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public ancestorBuffPercentage = 10;
     uint8 public gasonBuffPercentage = 10;
     uint8 public typeBuffPercentage = 20;
-    uint256 public castleMinFee = 0.08 ether;
+    uint256 public castleMinFee = 0.04 ether;
     uint8 public castleDestroyBonus = 50;// percentage
     uint8 public maxLevel = 100;
     uint16 public maxActiveCastle = 50;
