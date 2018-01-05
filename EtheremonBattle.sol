@@ -281,7 +281,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint256 public castleMinFee = 0.04 ether;
     uint8 public castleDestroyBonus = 50;// percentage
     uint8 public maxLevel = 100;
-    uint16 public maxActiveCastle = 50;
+    uint16 public maxActiveCastle = 30;
     uint8 public maxRandomRound = 6;
     
     uint8 public winBrickReturn = 8;
@@ -444,10 +444,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
      
         while (minIndex < maxIndex) {
             currentIndex = (minIndex + maxIndex) / 2;
-            if (exp < levelExps[currentIndex])
-                maxIndex = currentIndex - 1;
-            else
-                minIndex = currentIndex + 1;
+            while (minIndex < maxIndex) {
+                currentIndex = (minIndex + maxIndex) / 2;
+                if (exp < levelExps[currentIndex])
+                    maxIndex = currentIndex;
+                else
+                    minIndex = currentIndex + 1;
+            }
         }
         return minIndex;
     }
@@ -756,7 +759,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (castleId > 0 || castleIndex > 0)
             revert();
 
-        if (castle.countActiveCastle() > uint(maxActiveCastle))
+        if (castle.countActiveCastle() >= uint(maxActiveCastle))
             revert();
         if (msg.value < castleMinFee) {
             revert();
