@@ -282,8 +282,9 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public maxLevel = 100;
     uint16 public maxActiveCastle = 50;
     uint8 public maxRandomRound = 5;
-    uint8 public minDestroyBattle = 10; // battles
-    uint8 public minDestroyRate = 40; // percentage
+    
+    uint8 public winBrickReturn = 8;
+    uint256 public brickPrice = 0.008 ether;
     uint8 public minHpDeducted = 10;
     
     uint256 public totalEarn = 0;
@@ -571,30 +572,30 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return countEffect * ancestorBuffPercentage;
     }
     
-    function getGasonSupport(uint32 _classId, SupporterData _sup) constant private returns(uint16 attackSupport) {
+    function getGasonSupport(uint32 _classId, SupporterData _sup) constant private returns(uint16 defenseSupport) {
         uint i = 0;
         uint8 classType = 0;
         for (i = 0; i < cacheClasses[_classId].types.length; i++) {
             classType = cacheClasses[_classId].types[i];
              if (_sup.isGason1) {
                 if (classType == _sup.type1) {
-                    attackSupport += 1;
+                    defenseSupport += 1;
                     continue;
                 }
             }
             if (_sup.isGason2) {
                 if (classType == _sup.type2) {
-                    attackSupport += 1;
+                    defenseSupport += 1;
                     continue;
                 }
             }
             if (_sup.isGason3) {
                 if (classType == _sup.type3) {
-                    attackSupport += 1;
+                    defenseSupport += 1;
                     continue;
                 }
             }
-            attackSupport = attackSupport * gasonBuffPercentage;
+            defenseSupport = defenseSupport * gasonBuffPercentage;
         }
     }
     
@@ -684,13 +685,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint32 totalWin;
         uint32 totalLose;
         uint256 price;
-        uint32 minBattle;
-        (totalWin, totalLose, price, minBattle) = castle.getCastleWinLose(_castleId);
-        if (totalWin + totalLose >= minBattle) {
-            if (totalWin * 100 / (totalLose + totalWin)  < minDestroyRate) {
-                castle.removeCastleFromActive(_castleId);
-                return price;
-            }
+        uint32 brickNumber;
+        (totalWin, totalLose, price, brickNumber) = castle.getCastleWinLose(_castleId);
+        if (brickNumber + totalWin/winBrickReturn - totalLose <= 0) {
+            castle.removeCastleFromActive(_castleId);
+            return price;
         }
         return 0;
     }
@@ -748,7 +747,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         price = msg.value * castleDestroyBonus / 100;
         totalEarn += msg.value - price;
         castleId = castle.addCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3, 
-            price, uint32(msg.value * minDestroyBattle / castleMinFee));
+            price, uint32(msg.value / brickPrice));
         castle.transfer(price);
         EventCreateCastle(msg.sender, castleId);
     }

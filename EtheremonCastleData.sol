@@ -123,7 +123,7 @@ contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64[6] monsters; // 3 attackers, 3 supporters
         uint64[5] battleList;
         uint256 price;
-        uint32 minBattle;
+        uint32 brickNumber;
         uint createTime;
     }
     
@@ -175,7 +175,7 @@ contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function addCastle(address _trainer, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, 
-        uint256 _price, uint32 _minBattle) onlyModerators external returns(uint32 currentCastleId){
+        uint256 _price, uint32 _brickNumber) onlyModerators external returns(uint32 currentCastleId){
         currentCastleId = trainerCastle[_trainer];
         if (currentCastleId > 0)
             return currentCastleId;
@@ -192,7 +192,7 @@ contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castle.monsters[4] = _s2;
         castle.monsters[5] = _s3;
         castle.price = _price;
-        castle.minBattle = _minBattle;
+        castle.brickNumber = _brickNumber;
         castle.createTime = now;
         
         castle.index = ++activeCastleList.length;
@@ -303,12 +303,12 @@ contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     function getCastleWinLose(uint32 _castleId) constant external returns(uint32, uint32, uint256, uint32) {
         CastleData memory castle = castleData[_castleId];
-        return (castle.totalWin, castle.totalLose, castle.price, castle.minBattle);
+        return (castle.totalWin, castle.totalLose, castle.price, castle.brickNumber);
     }
     
     function getCastleStats(uint32 _castleId) constant external returns(string, address, uint256, uint32, uint32, uint32, uint) {
         CastleData memory castle = castleData[_castleId];
-        return (castle.name, castle.owner, castle.price, castle.minBattle, castle.totalWin, castle.totalLose, castle.createTime);
+        return (castle.name, castle.owner, castle.price, castle.brickNumber, castle.totalWin, castle.totalLose, castle.createTime);
     }
 
     function getBattleDataLog(uint64 _battleId) constant external returns(uint32, address, BattleResult, uint8, uint8, uint8, uint32, uint32, uint32) {
