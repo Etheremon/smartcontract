@@ -35,7 +35,7 @@ contract BasicAccessControl {
     // address[] public moderators;
     uint16 public totalModerators = 0;
     mapping (address => bool) public moderators;
-    bool public isMaintaining = false;
+    bool public isMaintaining = true;
 
     function BasicAccessControl() public {
         owner = msg.sender;
@@ -175,11 +175,11 @@ contract EtheremonCastleContract is EtheremonEnum, BasicAccessControl{
         onlyModerators external returns(uint32 currentCastleId);
     function renameCastle(uint32 _castleId, string _name) onlyModerators external;
     function removeCastleFromActive(uint32 _castleId) onlyModerators external;
+    function deductTrainerBrick(address _trainer, uint32 _deductAmount) onlyModerators external returns(bool);
     
     function addBattleLog(uint32 _castleId, address _attacker, 
         uint8 _ran1, uint8 _ran2, uint8 _ran3, uint8 _result, uint32 _castleExp1, uint32 _castleExp2, uint32 _castleExp3) onlyModerators external returns(uint64);
     function addBattleLogMonsterInfo(uint64 _battleId, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3, uint32 _exp1, uint32 _exp2, uint32 _exp3) onlyModerators external;
-    function deductTrainerBrick(address _trainer, uint32 _deductAmount) onlyModerators external returns(bool);
 }
 
 contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
@@ -652,8 +652,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         // add attack
         aStats[1] += aStats[1] * att.aAttackSupport;
         aStats[3] += aStats[3] * att.aAttackSupport;
-        bStats[1] += bStats[1] * att.aAttackSupport;
-        bStats[3] += bStats[3] * att.aAttackSupport;
+        bStats[1] += bStats[1] * att.bAttackSupport;
+        bStats[3] += bStats[3] * att.bAttackSupport;
         
         // add offense
         aStats[2] += aStats[2] * aDefenseBuff;
@@ -759,6 +759,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (numberBrick < castleMinBrick) {
             revert();
         }
+        castle.deductTrainerBrick(msg.sender, castle.getTrainerBrick(msg.sender));
         totalEarn += msg.value;
         castleId = castle.addCastle(msg.sender, _name, _a1, _a2, _a3, _s1, _s2, _s3, numberBrick);
         EventCreateCastle(msg.sender, castleId);
