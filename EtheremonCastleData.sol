@@ -105,7 +105,6 @@ contract EtheremonEnum {
 
 
 contract EtheremonCastleBattle is EtheremonEnum, BasicAccessControl, SafeMath {
-    uint8 constant public NO_MONSTER = 3;
     uint8 constant public NO_BATTLE_LOG = 4;
     
     struct CastleData {

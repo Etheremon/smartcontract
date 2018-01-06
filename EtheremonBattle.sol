@@ -668,7 +668,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         uint16[6] memory bStats;
         (aExp, aStats, bExp, bStats) = calculateBattleStats(att);
         
-        ran = getRandom(6, att.index, lastAttacker);
+        ran = getRandom(maxRandomRound+2, att.index, lastAttacker);
         uint16 round = 0;
         while (round < maxRandomRound && aStats[0] > 0 && bStats[0] > 0) {
             if (aStats[5] > bStats[5]) {
