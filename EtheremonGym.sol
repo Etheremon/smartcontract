@@ -201,7 +201,7 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
     mapping(uint8 => uint8) typeAdvantages;
     mapping(uint32 => CacheClassInfo) cacheClasses;
     mapping(uint8 => uint32) levelExps;
-    uint256 public gymFee = 0.005 ether;
+    uint256 public gymFee = 0.0005 ether;
     uint8 public maxTrainerLevel = 5;
     uint8 public totalTrainer = 0;
     uint8 public maxRandomRound = 4;
