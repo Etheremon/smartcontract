@@ -413,7 +413,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     function buyItem(uint64 _objId) requireDataContract requireBattleContract isActive external payable {
         // check item is valid to sell 
         uint256 requestPrice = sellingDict[_objId].price;
-        if (requestPrice == 0 || msg.value < requestPrice) {
+        if (requestPrice == 0 || msg.value != requestPrice) {
             revert();
         }
         
@@ -486,7 +486,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         if (item.lent == true)
             revert();
         uint256 itemPrice = item.price;
-        if (itemPrice > msg.value)
+        if (itemPrice != msg.value)
             revert();
         
 
