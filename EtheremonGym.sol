@@ -306,60 +306,60 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
     function presetGymTrainer() onlyModerators external {
         GymTrainer storage trainer1 = gymTrainers[1];
         trainer1.classId = 12;
-        trainer1.statBases[0] = 75;
-        trainer1.statBases[1] = 85;
-        trainer1.statBases[2] = 55;
-        trainer1.statBases[3] = 40;
-        trainer1.statBases[4] = 40;
-        trainer1.statBases[5] = 40;
+        trainer1.statBases[0] = 90;
+        trainer1.statBases[1] = 100;
+        trainer1.statBases[2] = 70;
+        trainer1.statBases[3] = 55;
+        trainer1.statBases[4] = 55;
+        trainer1.statBases[5] = 55;
         GymTrainer storage trainer2 = gymTrainers[2];
         trainer2.classId = 15;
-        trainer2.statBases[0] = 35;
-        trainer2.statBases[1] = 45;
-        trainer2.statBases[2] = 75;
-        trainer2.statBases[3] = 75;
-        trainer2.statBases[4] = 30;
-        trainer2.statBases[5] = 65;
+        trainer2.statBases[0] = 50;
+        trainer2.statBases[1] = 60;
+        trainer2.statBases[2] = 90;
+        trainer2.statBases[3] = 90;
+        trainer2.statBases[4] = 45;
+        trainer2.statBases[5] = 80;
         GymTrainer storage trainer3 = gymTrainers[3];
         trainer3.classId = 8;
         trainer3.statBases[0] = 120;
-        trainer3.statBases[1] = 50;
-        trainer3.statBases[2] = 25;
-        trainer3.statBases[3] = 50;
-        trainer3.statBases[4] = 30;
-        trainer3.statBases[5] = 25;
+        trainer3.statBases[1] = 65;
+        trainer3.statBases[2] = 40;
+        trainer3.statBases[3] = 65;
+        trainer3.statBases[4] = 45;
+        trainer3.statBases[5] = 40;
         GymTrainer storage trainer4 = gymTrainers[4];
         trainer4.classId = 4;
-        trainer4.statBases[0] = 44;
-        trainer4.statBases[1] = 57;
-        trainer4.statBases[2] = 48;
-        trainer4.statBases[3] = 65;
-        trainer4.statBases[4] = 65;
-        trainer4.statBases[5] = 60;
+        trainer4.statBases[0] = 59;
+        trainer4.statBases[1] = 74;
+        trainer4.statBases[2] = 63;
+        trainer4.statBases[3] = 80;
+        trainer4.statBases[4] = 80;
+        trainer4.statBases[5] = 75;
         GymTrainer storage trainer5 = gymTrainers[5];
         trainer5.classId = 6;
-        trainer5.statBases[0] = 35;
-        trainer5.statBases[1] = 40;
-        trainer5.statBases[2] = 35;
-        trainer5.statBases[3] = 105;
-        trainer5.statBases[4] = 40;
-        trainer5.statBases[5] = 85;
+        trainer5.statBases[0] = 50;
+        trainer5.statBases[1] = 55;
+        trainer5.statBases[2] = 50;
+        trainer5.statBases[3] = 110;
+        trainer5.statBases[4] = 55;
+        trainer5.statBases[5] = 100;
         GymTrainer storage trainer6 = gymTrainers[6];
         trainer6.classId = 13;
-        trainer6.statBases[0] = 40;
-        trainer6.statBases[1] = 80;
+        trainer6.statBases[0] = 55;
+        trainer6.statBases[1] = 95;
         trainer6.statBases[2] = 100;
-        trainer6.statBases[3] = 30;
-        trainer6.statBases[4] = 20;
-        trainer6.statBases[5] = 20;
+        trainer6.statBases[3] = 45;
+        trainer6.statBases[4] = 35;
+        trainer6.statBases[5] = 35;
         GymTrainer storage trainer7 = gymTrainers[7];
         trainer7.classId = 7;
-        trainer7.statBases[0] = 75;
-        trainer7.statBases[1] = 50;
-        trainer7.statBases[2] = 53;
-        trainer7.statBases[3] = 65;
-        trainer7.statBases[4] = 70;
-        trainer7.statBases[5] = 40;
+        trainer7.statBases[0] = 90;
+        trainer7.statBases[1] = 65;
+        trainer7.statBases[2] = 78;
+        trainer7.statBases[3] = 80;
+        trainer7.statBases[4] = 85;
+        trainer7.statBases[5] = 55;
         GymTrainer storage trainer8 = gymTrainers[8];
         trainer8.classId = 24;
         trainer8.statBases[0] = 145;
@@ -373,7 +373,7 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
         trainer9.statBases[0] = 70;
         trainer9.statBases[1] = 110;
         trainer9.statBases[2] = 80;
-        trainer9.statBases[3] = 55;
+        trainer9.statBases[3] = 60;
         trainer9.statBases[4] = 80;
         trainer9.statBases[5] = 105;
         totalTrainer = 9;
@@ -482,11 +482,11 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
         winExp = levelExpGains[yLevel] * expPercentage / 100;
         if (xLevel > yLevel) {
             if (xLevel > yLevel + 10) {
-                winExp = 10;
+                winExp = 5;
             } else {
                 winExp /= uint32(3) ** (xLevel - yLevel) / uint32(2) ** (xLevel - yLevel);
-                if (winExp < 10)
-                    winExp = 10;
+                if (winExp < 5)
+                    winExp = 5;
             }
         }
         loseExp = winExp / 3;
@@ -534,31 +534,33 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
             _ran = _ran - _index * maxRandomRound;
             
         uint16 round = 0;
+        uint16 aHp = _aStats[0];
+        uint16 bHp = _bStats[0];
         if (_aStats[5] > _bStats[5]) {
-            while (round < maxRandomRound && _aStats[0] > 0 && _bStats[0] > 0) {
+            while (round < maxRandomRound && aHp > 0 && bHp > 0) {
                 if (round % 2 == 0) {
                     // a attack 
-                    _bStats[0] = safeDeduct(_bStats[0], calHpDeducted(_aStats[1], _aStats[3], _bStats[2], _bStats[4], round==_ran));
+                    bHp = safeDeduct(bHp, calHpDeducted(_aStats[1], _aStats[3], _bStats[2], _bStats[4], round==_ran));
                 } else {
-                    _aStats[0] = safeDeduct(_aStats[0], calHpDeducted(_bStats[1], _bStats[3], _aStats[2], _aStats[4], round==_ran));
+                    aHp = safeDeduct(aHp, calHpDeducted(_bStats[1], _bStats[3], _aStats[2], _aStats[4], round==_ran));
                 }
                 round++;
             }
         } else {
-            while (round < maxRandomRound && _aStats[0] > 0 && _bStats[0] > 0) {
+            while (round < maxRandomRound && aHp > 0 && bHp > 0) {
                 if (round % 2 != 0) {
-                    _bStats[0] = safeDeduct(_bStats[0], calHpDeducted(_aStats[1], _aStats[3], _bStats[2], _bStats[4], round==_ran));
+                    bHp = safeDeduct(bHp, calHpDeducted(_aStats[1], _aStats[3], _bStats[2], _bStats[4], round==_ran));
                 } else {
-                    _aStats[0] = safeDeduct(_aStats[0], calHpDeducted(_bStats[1], _bStats[3], _aStats[2], _aStats[4], round==_ran));
+                    aHp = safeDeduct(aHp, calHpDeducted(_bStats[1], _bStats[3], _aStats[2], _aStats[4], round==_ran));
                 }
                 round++;
             }
         }
         
-        win = _aStats[0] >= _bStats[0];
+        win = aHp >= bHp;
     }
     
-    function attackTrainer(uint8 _index, uint8 _ran, uint8 _trainerId, uint8 _trainerLevel, uint32 _objClassId, uint16[6] _objStats) constant public returns(bool) {
+    function attackTrainer(uint8 _index, uint8 _ran, uint8 _trainerId, uint8 _trainerLevel, uint32 _objClassId, uint16[6] _objStats) constant public returns(bool result) {
         GymTrainer memory trainer = gymTrainers[_trainerId];
         uint16[6] memory trainerStats;
         uint i = 0;
@@ -572,6 +574,8 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
         bool objHasAdvantage;
         bool trainerHasAdvantage;
         (objHasAdvantage, trainerHasAdvantage) = getTypeSupport(_objClassId, trainer.classId);
+        uint16 orginAttack = _objStats[1];
+        uint16 orginAttackSpecial = _objStats[3];
         if (objHasAdvantage) {
             _objStats[1] += _objStats[1] * typeBuffPercentage / 100;
             _objStats[3] += _objStats[3] * typeBuffPercentage / 100;
@@ -580,7 +584,9 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
             trainerStats[1] += trainerStats[1] * typeBuffPercentage / 100;
             trainerStats[3] += trainerStats[3] * typeBuffPercentage / 100;
         }
-        return attack(_index, _ran, _objStats, trainerStats);
+        result = attack(_index, _ran, _objStats, trainerStats);
+        _objStats[1] = orginAttack;
+        _objStats[3] = orginAttackSpecial;
     }
     
     function getObjInfo(uint64 _objId) constant public returns(uint32 classId, address trainee, uint8 level) {
