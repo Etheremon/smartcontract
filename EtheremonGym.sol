@@ -155,7 +155,6 @@ contract EtheremonGateway is EtheremonEnum, BasicAccessControl {
 
 contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 constant public STAT_COUNT = 6;
-    uint8 constant public NO_TRAINER_PER_BATCH = 3;
     
     struct MonsterObjAcc {
         uint64 monsterId;
@@ -306,76 +305,76 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
     function presetGymTrainer() onlyModerators external {
         GymTrainer storage trainer1 = gymTrainers[1];
         trainer1.classId = 12;
-        trainer1.statBases[0] = 90;
-        trainer1.statBases[1] = 100;
-        trainer1.statBases[2] = 70;
-        trainer1.statBases[3] = 55;
-        trainer1.statBases[4] = 55;
-        trainer1.statBases[5] = 55;
+        trainer1.statBases[0] = 85;
+        trainer1.statBases[1] = 95;
+        trainer1.statBases[2] = 65;
+        trainer1.statBases[3] = 50;
+        trainer1.statBases[4] = 50;
+        trainer1.statBases[5] = 50;
         GymTrainer storage trainer2 = gymTrainers[2];
         trainer2.classId = 15;
         trainer2.statBases[0] = 50;
-        trainer2.statBases[1] = 60;
-        trainer2.statBases[2] = 90;
-        trainer2.statBases[3] = 90;
-        trainer2.statBases[4] = 45;
-        trainer2.statBases[5] = 80;
+        trainer2.statBases[1] = 55;
+        trainer2.statBases[2] = 85;
+        trainer2.statBases[3] = 85;
+        trainer2.statBases[4] = 40;
+        trainer2.statBases[5] = 75;
         GymTrainer storage trainer3 = gymTrainers[3];
         trainer3.classId = 8;
-        trainer3.statBases[0] = 120;
-        trainer3.statBases[1] = 65;
+        trainer3.statBases[0] = 110;
+        trainer3.statBases[1] = 60;
         trainer3.statBases[2] = 40;
-        trainer3.statBases[3] = 65;
-        trainer3.statBases[4] = 45;
+        trainer3.statBases[3] = 60;
+        trainer3.statBases[4] = 40;
         trainer3.statBases[5] = 40;
         GymTrainer storage trainer4 = gymTrainers[4];
         trainer4.classId = 4;
-        trainer4.statBases[0] = 59;
-        trainer4.statBases[1] = 74;
-        trainer4.statBases[2] = 63;
-        trainer4.statBases[3] = 80;
-        trainer4.statBases[4] = 80;
-        trainer4.statBases[5] = 75;
+        trainer4.statBases[0] = 54;
+        trainer4.statBases[1] = 69;
+        trainer4.statBases[2] = 58;
+        trainer4.statBases[3] = 75;
+        trainer4.statBases[4] = 75;
+        trainer4.statBases[5] = 70;
         GymTrainer storage trainer5 = gymTrainers[5];
         trainer5.classId = 6;
         trainer5.statBases[0] = 50;
-        trainer5.statBases[1] = 55;
+        trainer5.statBases[1] = 50;
         trainer5.statBases[2] = 50;
-        trainer5.statBases[3] = 110;
+        trainer5.statBases[3] = 105;
         trainer5.statBases[4] = 55;
-        trainer5.statBases[5] = 100;
+        trainer5.statBases[5] = 95;
         GymTrainer storage trainer6 = gymTrainers[6];
         trainer6.classId = 13;
         trainer6.statBases[0] = 55;
-        trainer6.statBases[1] = 95;
-        trainer6.statBases[2] = 100;
+        trainer6.statBases[1] = 90;
+        trainer6.statBases[2] = 95;
         trainer6.statBases[3] = 45;
         trainer6.statBases[4] = 35;
         trainer6.statBases[5] = 35;
         GymTrainer storage trainer7 = gymTrainers[7];
         trainer7.classId = 7;
-        trainer7.statBases[0] = 90;
-        trainer7.statBases[1] = 65;
-        trainer7.statBases[2] = 78;
-        trainer7.statBases[3] = 80;
-        trainer7.statBases[4] = 85;
-        trainer7.statBases[5] = 55;
+        trainer7.statBases[0] = 85;
+        trainer7.statBases[1] = 60;
+        trainer7.statBases[2] = 73;
+        trainer7.statBases[3] = 75;
+        trainer7.statBases[4] = 80;
+        trainer7.statBases[5] = 50;
         GymTrainer storage trainer8 = gymTrainers[8];
         trainer8.classId = 24;
-        trainer8.statBases[0] = 145;
-        trainer8.statBases[1] = 150;
+        trainer8.statBases[0] = 140;
+        trainer8.statBases[1] = 135;
         trainer8.statBases[2] = 70;
         trainer8.statBases[3] = 77;
-        trainer8.statBases[4] = 95;
+        trainer8.statBases[4] = 90;
         trainer8.statBases[5] = 50;
         GymTrainer storage trainer9 = gymTrainers[9];
         trainer9.classId = 16;
         trainer9.statBases[0] = 70;
-        trainer9.statBases[1] = 110;
+        trainer9.statBases[1] = 105;
         trainer9.statBases[2] = 80;
         trainer9.statBases[3] = 60;
         trainer9.statBases[4] = 80;
-        trainer9.statBases[5] = 105;
+        trainer9.statBases[5] = 90;
         totalTrainer = 9;
     }
     
@@ -527,7 +526,7 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
         return hpSpecialDeducted;
     }
     
-    function attack(uint8 _index, uint8 _ran, uint16[6] _aStats, uint16[6] _bStats) constant private returns(bool win) {
+    function attack(uint8 _index, uint8 _ran, uint16[6] _aStats, uint16[6] _bStats) constant public returns(bool win) {
         if (_ran < _index * maxRandomRound)
             _ran = maxRandomRound;
         else
@@ -574,8 +573,8 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
         bool objHasAdvantage;
         bool trainerHasAdvantage;
         (objHasAdvantage, trainerHasAdvantage) = getTypeSupport(_objClassId, trainer.classId);
-        uint16 orginAttack = _objStats[1];
-        uint16 orginAttackSpecial = _objStats[3];
+        uint16 originAttack = _objStats[1];
+        uint16 originAttackSpecial = _objStats[3];
         if (objHasAdvantage) {
             _objStats[1] += _objStats[1] * typeBuffPercentage / 100;
             _objStats[3] += _objStats[3] * typeBuffPercentage / 100;
@@ -585,8 +584,8 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
             trainerStats[3] += trainerStats[3] * typeBuffPercentage / 100;
         }
         result = attack(_index, _ran, _objStats, trainerStats);
-        _objStats[1] = orginAttack;
-        _objStats[3] = orginAttackSpecial;
+        _objStats[1] = originAttack;
+        _objStats[3] = originAttackSpecial;
     }
     
     function getObjInfo(uint64 _objId) constant public returns(uint32 classId, address trainee, uint8 level) {
@@ -632,7 +631,7 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
 
         (att.winExp, att.loseExp) = getGainExp(att.objLevel, _trainerLevel);
         EtheremonGateway gateway = EtheremonGateway(worldContract);
-        gateway.increaseMonsterExp(_objId, att.winCount * att.winExp + (NO_TRAINER_PER_BATCH - att.winCount) * att.loseExp);
+        gateway.increaseMonsterExp(_objId, att.winCount * att.winExp + (3 - att.winCount) * att.loseExp);
         
         TrainingLog storage trainingLog = trainees[msg.sender];
         trainingLog.trainers[0] = _t1;
