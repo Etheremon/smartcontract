@@ -47,7 +47,7 @@ contract BasicAccessControl {
     }
 
     modifier onlyModerators() {
-        require(moderators[msg.sender] == true);
+        require(msg.sender == owner || moderators[msg.sender] == true);
         _;
     }
 
@@ -191,7 +191,6 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // data contract
     address public dataContract;
-    address public worldContract;
     address public battleContract;
     mapping(uint32 => Gen0Config) public gen0Config;
     
@@ -213,8 +212,8 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         _;
     }
     
-    modifier requireWorldContract {
-        require(worldContract != address(0));
+    modifier requireBattleContract {
+        require(battleContract != address(0));
         _;
     }
     
@@ -225,11 +224,11 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     event EventAcceptBorrowItem(address indexed borrower, uint64 objId);
     event EventGetBackItem(address indexed owner, uint64 objId);
     event EventFreeTransferItem(address indexed sender, address indexed receiver, uint64 objId);
+    event EventRelease(address indexed trainer, uint64 objId);
     
     // constructor
-    function EtheremonTrade(address _dataContract, address _worldContract, address _battleContract) public {
+    function EtheremonTrade(address _dataContract, address _battleContract) public {
         dataContract = _dataContract;
-        worldContract = _worldContract;
         battleContract = _battleContract;
     }
     
@@ -254,16 +253,15 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         gen0Config[17] = Gen0Config(17, 1 ether, 0.01 ether, 305); 
         gen0Config[18] = Gen0Config(18, 0.1 ether, 0.001 ether, 427);
         gen0Config[19] = Gen0Config(19, 1 ether, 0.01 ether, 304);
-        gen0Config[20] = Gen0Config(20, 0.4 ether, 0.005 ether, 82);
+        gen0Config[20] = Gen0Config(20, 0.4 ether, 0.05 ether, 82);
         gen0Config[21] = Gen0Config(21, 1, 1, 123);
         gen0Config[22] = Gen0Config(22, 0.2 ether, 0.001 ether, 468);
         gen0Config[23] = Gen0Config(23, 0.5 ether, 0.0025 ether, 302);
         gen0Config[24] = Gen0Config(24, 1 ether, 0.005 ether, 195);
     }
     
-    function setContract(address _dataContract, address _worldContract, address _battleContract) onlyModerators public {
+    function setContract(address _dataContract, address _battleContract) onlyModerators public {
         dataContract = _dataContract;
-        worldContract = _worldContract;
         battleContract = _battleContract;
     }
     
@@ -360,7 +358,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     // public
-    function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract isActive external {
+    function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract requireBattleContract isActive external {
         // not on selling
         if (sellingDict[_objId].index > 0 || _price == 0)
             revert();
@@ -391,7 +389,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventPlaceSellOrder(msg.sender, _objId);
     }
     
-    function removeSellOrder(uint64 _objId) requireDataContract isActive external {
+    function removeSellOrder(uint64 _objId) requireDataContract requireBattleContract isActive external {
         if (sellingDict[_objId].index == 0)
             revert();
         
@@ -412,7 +410,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeSellingItem(_objId);
     }
     
-    function buyItem(uint64 _objId) requireDataContract isActive external payable {
+    function buyItem(uint64 _objId) requireDataContract requireBattleContract isActive external payable {
         // check item is valid to sell 
         uint256 requestPrice = sellingDict[_objId].price;
         if (requestPrice == 0 || msg.value < requestPrice) {
@@ -436,7 +434,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventBuyItem(msg.sender, _objId);
     }
     
-    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract isActive external {
+    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract requireBattleContract isActive external {
         // make sure it is not on sale 
         if (sellingDict[_objId].price > 0 || _price == 0)
             revert();
@@ -468,7 +466,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventOfferBorrowingItem(msg.sender, _objId);
     }
     
-    function removeBorrowingOfferItem(uint64 _objId) requireDataContract isActive external {
+    function removeBorrowingOfferItem(uint64 _objId) requireDataContract requireBattleContract isActive external {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -481,7 +479,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeBorrowingItem(_objId);
     }
     
-    function borrowItem(uint64 _objId) requireDataContract isActive external payable {
+    function borrowItem(uint64 _objId) requireDataContract requireBattleContract isActive external payable {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -511,7 +509,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventAcceptBorrowItem(msg.sender, _objId);
     }
     
-    function getBackLendingItem(uint64 _objId) requireDataContract isActive external {
+    function getBackLendingItem(uint64 _objId) requireDataContract requireBattleContract isActive external {
         BorrowItem storage item = borrowingDict[_objId];
         if (item.index == 0)
             revert();
@@ -528,7 +526,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         EventGetBackItem(msg.sender, _objId);
     }
     
-    function freeTransferItem(uint64 _objId, address _receiver) requireDataContract isActive external {
+    function freeTransferItem(uint64 _objId, address _receiver) requireDataContract requireBattleContract external {
         // make sure it is not on sale 
         if (sellingDict[_objId].price > 0)
             revert();
@@ -557,6 +555,42 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         
         transferMonster(_receiver, _objId);
         EventFreeTransferItem(msg.sender, _receiver, _objId);
+    }
+    
+    function release(uint64 _objId) requireDataContract requireBattleContract external {
+        // make sure it is not on sale 
+        if (sellingDict[_objId].price > 0)
+            revert();
+        // not on borrowing
+        BorrowItem storage item = borrowingDict[_objId];
+        if (item.index > 0)
+            revert();
+        // not on battle 
+        EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+        if (battle.isOnBattle(_objId))
+            revert();
+        
+        // check ownership
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterObjAcc memory obj;
+        uint32 _ = 0;
+        (obj.monsterId, obj.classId, obj.trainer, obj.exp, _, _, obj.createTime) = data.getMonsterObj(_objId);
+        
+        // can not release gen 0
+        if (obj.classId <= GEN0_NO) {
+            revert();
+        }
+        
+        if (obj.monsterId != _objId) {
+            revert();
+        }
+        
+        if (obj.trainer != msg.sender) {
+            revert();
+        }
+        
+        data.removeMonsterIdMapping(msg.sender, _objId);
+        EventRelease(msg.sender, _objId);
     }
     
     // read access
