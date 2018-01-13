@@ -484,7 +484,7 @@ contract EtheremonGym is EtheremonEnum, BasicAccessControl, SafeMath {
             if (xLevel > yLevel + 10) {
                 winExp = 10;
             } else {
-                winExp /= uint32(3) ** (level1 - level2) / uint32(2) ** (level1 - level2);
+                winExp /= uint32(3) ** (xLevel - yLevel) / uint32(2) ** (xLevel - yLevel);
                 if (winExp < 10)
                     winExp = 10;
             }
