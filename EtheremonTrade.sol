@@ -205,7 +205,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     uint64[] public borrowingList;
     
     // trading fee
-    uint16 public tradingFeeRatio = 100;
+    uint16 public tradingFeePercentage = 1;
     
     modifier requireDataContract {
         require(dataContract != address(0));
@@ -266,7 +266,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function updateTradingFee(uint16 _fee) onlyModerators public {
-        tradingFeeRatio = _fee;
+        tradingFeePercentage = _fee;
     }
     
     function withdrawEther(address _sendTo, uint _amount) onlyModerators public {
@@ -425,9 +425,13 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         if (obj.monsterId != _objId) {
             revert();
         }
+        // can not buy from yourself
+        if (obj.trainer == msg.sender) {
+            revert();
+        }
         
         address oldTrainer = obj.trainer;
-        uint256 fee = requestPrice / tradingFeeRatio;
+        uint256 fee = requestPrice * tradingFeePercentage / 100;
         removeSellingItem(_objId);
         transferMonster(msg.sender, _objId);
         oldTrainer.transfer(safeSubtract(requestPrice, fee));
@@ -498,8 +502,12 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         if (obj.monsterId != _objId) {
             revert();
         }
+        // can not borrow from yourself
+        if (obj.trainer == msg.sender) {
+            revert();
+        }
         
-        uint256 fee = itemPrice/tradingFeeRatio;
+        uint256 fee = itemPrice * tradingFeePercentage / 100;
         item.borrower = msg.sender;
         item.releaseBlock += block.number;
         item.lent = true;
