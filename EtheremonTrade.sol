@@ -142,6 +142,7 @@ contract EtheremonDataBase is EtheremonEnum, BasicAccessControl, SafeMath {
 
 interface EtheremonBattleInterface {
     function isOnBattle(uint64 _objId) constant external returns(bool) ;
+    function getMonsterCP(uint64 _objId) constant external returns(uint64);
 }
 
 contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
@@ -181,12 +182,18 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         address borrower;
         uint256 price;
         bool lent;
-        uint releaseBlock;
+        uint releaseTime;
     }
     
     struct SellingItem {
         uint index;
         uint256 price;
+    }
+    
+    struct SoldItem {
+        uint64 objId;
+        uint256 price;
+        uint time;
     }
     
     // data contract
@@ -204,8 +211,12 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     uint32 public totalBorrowingItem;
     uint64[] public borrowingList;
     
+    mapping(address => uint64[]) public lendingList;
+    mapping(address => SoldItem[]) public soldList;
+    
     // trading fee
     uint16 public tradingFeePercentage = 1;
+    uint8 public maxLendingItem = 10;
     
     modifier requireDataContract {
         require(dataContract != address(0));
@@ -265,8 +276,9 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         battleContract = _battleContract;
     }
     
-    function updateTradingFee(uint16 _fee) onlyModerators public {
+    function updateConfig(uint16 _fee, uint8 _maxLendingItem) onlyModerators public {
         tradingFeePercentage = _fee;
+        maxLendingItem = _maxLendingItem;
     }
     
     function withdrawEther(address _sendTo, uint _amount) onlyModerators public {
@@ -317,13 +329,13 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }
 
-    function addBorrowingItem(address _owner, uint64 _itemId, uint256 _price, uint blockCount) private {
+    function addBorrowingItem(address _owner, uint64 _itemId, uint256 _price, uint _releaseTime) private {
         BorrowItem storage item = borrowingDict[_itemId];
         item.owner = _owner;
         item.borrower = address(0);
         item.price = _price;
         item.lent = false;
-        item.releaseBlock = blockCount;
+        item.releaseTime = _releaseTime;
         
         if (item.index == 0) {
             item.index = ++borrowingList.length;
@@ -357,10 +369,36 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         data.addMonsterIdMapping(_to, _objId);
     }
     
+    function addItemLendingList(address _trainer, uint64 _objId) private {
+        if (_trainer != address(0)) {
+            uint64[] storage objList = lendingList[_trainer];
+            for (uint index = 0; index < objList.length; index++) {
+                if (objList[index] == _objId) {
+                    return;
+                }
+            }
+            objList.push(_objId);
+        }
+    }
+    
+    function removeItemLendingList(address _trainer, uint64 _objId) private {
+        uint foundIndex = 0;
+        uint64[] storage objList = lendingList[_trainer];
+        for (; foundIndex < objList.length; foundIndex++) {
+            if (objList[foundIndex] == _objId) {
+                break;
+            }
+        }
+        if (foundIndex < objList.length) {
+            objList[foundIndex] = objList[objList.length-1];
+            delete objList[objList.length-1];
+            objList.length--;
+        }
+    }
+    
     // public
     function placeSellOrder(uint64 _objId, uint256 _price) requireDataContract requireBattleContract isActive external {
-        // not on selling
-        if (sellingDict[_objId].index > 0 || _price == 0)
+        if (_price == 0)
             revert();
         // not on borrowing
         BorrowItem storage item = borrowingDict[_objId];
@@ -385,7 +423,12 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         }
         
-        addSellingItem(_objId, _price);
+        // on selling, then just update price
+        if (sellingDict[_objId].index > 0){
+            sellingDict[_objId].price = _price;
+        } else {
+            addSellingItem(_objId, _price);
+        }
         EventPlaceSellOrder(msg.sender, _objId);
     }
     
@@ -435,16 +478,19 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         removeSellingItem(_objId);
         transferMonster(msg.sender, _objId);
         oldTrainer.transfer(safeSubtract(requestPrice, fee));
+        
+        SoldItem memory soldItem = SoldItem(_objId, requestPrice, block.timestamp);
+        soldList[oldTrainer].push(soldItem);
         EventBuyItem(msg.sender, _objId);
     }
     
-    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _blockCount) requireDataContract requireBattleContract isActive external {
+    function offerBorrowingItem(uint64 _objId, uint256 _price, uint _releaseTime) requireDataContract requireBattleContract isActive external {
         // make sure it is not on sale 
         if (sellingDict[_objId].price > 0 || _price == 0)
             revert();
-        // not on borrowing
+        // not on lent
         BorrowItem storage item = borrowingDict[_objId];
-        if (item.index > 0)
+        if (item.lent == true)
             revert();
         // not on battle 
         EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
@@ -466,7 +512,13 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         }
         
-        addBorrowingItem(msg.sender, _objId, _price, _blockCount);
+        if (item.index > 0) {
+            // update info 
+            item.price = _price;
+            item.releaseTime = _releaseTime;
+        } else {
+            addBorrowingItem(msg.sender, _objId, _price, _releaseTime);
+        }
         EventOfferBorrowingItem(msg.sender, _objId);
     }
     
@@ -509,11 +561,12 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         
         uint256 fee = itemPrice * tradingFeePercentage / 100;
         item.borrower = msg.sender;
-        item.releaseBlock += block.number;
+        item.releaseTime += block.timestamp;
         item.lent = true;
         address oldOwner = obj.trainer;
         transferMonster(msg.sender, _objId);
         oldOwner.transfer(safeSubtract(itemPrice, fee));
+        addItemLendingList(oldOwner, _objId);
         EventAcceptBorrowItem(msg.sender, _objId);
     }
     
@@ -523,7 +576,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         if (item.lent == false)
             revert();
-        if (item.releaseBlock > block.number)
+        if (item.releaseTime > block.timestamp)
             revert();
         
         if (msg.sender != item.owner)
@@ -531,6 +584,7 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
         
         removeBorrowingItem(_objId);
         transferMonster(msg.sender, _objId);
+        removeItemLendingList(msg.sender, _objId);
         EventGetBackItem(msg.sender, _objId);
     }
     
@@ -603,35 +657,119 @@ contract EtheremonTrade is EtheremonEnum, BasicAccessControl, SafeMath {
     
     // read access
     
+    function getBasicObjInfo(uint64 _objId) constant public returns(uint32, address, uint32, uint32){
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterObjAcc memory obj;
+        (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
+        return (obj.classId, obj.trainer, obj.exp, obj.createIndex);
+    }
+    
+    function getBasicObjInfoWithBp(uint64 _objId) constant public returns(uint32, uint32, uint32, uint64) {
+        EtheremonDataBase data = EtheremonDataBase(dataContract);
+        MonsterObjAcc memory obj;
+        (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
+        EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+        uint64 bp = battle.getMonsterCP(_objId);
+        return (obj.classId, obj.exp, obj.createIndex, bp);
+    }
+    
     function getTotalSellingItem() constant external returns(uint) {
         return sellingList.length;
     }
 
-    function getSellingItemId(uint _index) constant external returns(uint64) {
-        return sellingList[_index];
+    function getSellingItem(uint _index) constant external returns(uint64 objId, uint32 classId, uint32 exp, uint64 bp, address trainer, uint createIndex, uint256 price) {
+        objId = sellingList[_index];
+        if (objId > 0) {
+            (classId, trainer, exp, createIndex) = getBasicObjInfo(objId);
+            EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+            bp = battle.getMonsterCP(objId);
+            price = sellingDict[objId].price;
+        }
     }
     
-    function getSellingItemPrice(uint64 _itemId) constant external returns(uint256) {
-        return sellingDict[_itemId].price;
+    function getSellingItemByObjId(uint64 _objId) constant external returns(uint32 classId, uint32 exp, uint64 bp, address trainer, uint createIndex, uint256 price) {
+        price = sellingDict[_objId].price;
+        if (price > 0) {
+            (classId, trainer, exp, createIndex) = getBasicObjInfo(_objId);
+            EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+            bp = battle.getMonsterCP(_objId);
+        }
     }
 
     function getTotalBorrowingItem() constant external returns(uint) {
         return borrowingList.length;
     }
 
-    function getBorrowingItemId(uint _index) constant external returns(uint64) {
-        return borrowingList[_index];
+    function getBorrowingItem(uint _index) constant external returns(uint64 objId, address owner, address borrower, 
+        uint256 price, bool lent, uint releaseTime, uint32 classId, uint32 exp, uint32 createIndex, uint64 bp) {
+        objId = borrowingList[_index];
+        BorrowItem storage item = borrowingDict[objId];
+        owner = item.owner;
+        borrower = item.borrower;
+        price = item.price;
+        lent = item.lent;
+        releaseTime = item.releaseTime;
+        
+        (classId, exp, createIndex, bp) = getBasicObjInfoWithBp(objId);
     }
     
-    function getBorrowingInfoPrice(uint64 _itemId) constant external returns(uint index, address owner, address borrower, 
-        uint256 price, bool lent, uint releaseBlock) {
-        BorrowItem storage item = borrowingDict[_itemId];
+    function getBorrowingItemByObjId(uint64 _objId) constant external returns(uint index, address owner, address borrower, 
+        uint256 price, bool lent, uint releaseTime, uint32 classId, uint32 exp, uint32 createIndex, uint64 bp) {
+        BorrowItem storage item = borrowingDict[_objId];
         index = item.index;
         owner = item.owner;
         borrower = item.borrower;
         price = item.price;
         lent = item.lent;
-        releaseBlock = item.releaseBlock;
+        releaseTime = item.releaseTime;
+        
+        (classId, exp, createIndex, bp) = getBasicObjInfoWithBp(_objId);
+    }
+    
+    function getSoldItemLength(address _trainer) constant external returns(uint) {
+        return soldList[_trainer].length;
+    }
+    
+    function getSoldItem(address _trainer, uint _index) constant external returns(uint64 objId, uint32 classId, uint32 exp, uint64 bp, address currentOwner, 
+        uint createIndex, uint256 price, uint time) {
+        if (_index > soldList[_trainer].length)
+            return;
+        SoldItem memory soldItem = soldList[_trainer][_index];
+        objId = soldItem.objId;
+        price = soldItem.price;
+        time = soldItem.time;
+        if (objId > 0) {
+            (classId, currentOwner, exp, createIndex) = getBasicObjInfo(objId);
+            EtheremonBattleInterface battle = EtheremonBattleInterface(battleContract);
+            bp = battle.getMonsterCP(objId);
+        }
+    }
+    
+    function getLendingItemLength(address _trainer) constant external returns(uint) {
+        return lendingList[_trainer].length;
+    }
+    
+    function getLendingItemInfo(address _trainer, uint _index) constant external returns(uint64 objId, address owner, address borrower, 
+        uint256 price, bool lent, uint releaseTime, uint32 classId, uint32 exp, uint32 createIndex, uint64 bp) {
+        if (_index > lendingList[_trainer].length)
+            return;
+        objId = lendingList[_trainer][_index];
+        BorrowItem storage item = borrowingDict[objId];
+        owner = item.owner;
+        borrower = item.borrower;
+        price = item.price;
+        lent = item.lent;
+        releaseTime = item.releaseTime;
+        
+        (classId, exp, createIndex, bp) = getBasicObjInfoWithBp(objId);
+    }
+    
+    function getTradingInfo(uint64 _objId) constant external returns(uint256 sellingPrice, uint256 lendingPrice, bool lent, uint releaseTime) {
+        sellingPrice = sellingDict[_objId].price;
+        BorrowItem storage item = borrowingDict[_objId];
+        lendingPrice = item.price;
+        lent = item.lent;
+        releaseTime = item.releaseTime;
     }
     
     function isOnTrading(uint64 _objId) constant external returns(bool) {
