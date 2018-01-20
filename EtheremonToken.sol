@@ -149,6 +149,12 @@ contract TokenERC20 {
     }
 }
 
+contract PaymentInterface {
+    function createCastle(address _trainer, uint _tokens, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) public returns(uint);
+    function catchMonster(address _trainer, uint _tokens, uint32 _classId, string _name) public returns(uint);
+    function payService(address _trainer, uint _tokens, uint32 _type, string _text, uint64 _param1, uint64 _param2, uint64 _param3) public returns(uint);
+}
+
 contract EtheremonToken is BasicAccessControl, TokenERC20 {
     // metadata
     string public constant name = "Etheremon";
@@ -157,7 +163,12 @@ contract EtheremonToken is BasicAccessControl, TokenERC20 {
     string public version = "1.0";
     
     // deposit address
-    address public fundAddress;
+    address public inGameRewardAddress;
+    address public userGrowPoolAddress;
+    address public developerAddress;
+    
+    // Etheremon payment
+    address public paymentContract;
     
     // for future feature
     uint256 public sellPrice;
@@ -171,14 +182,35 @@ contract EtheremonToken is BasicAccessControl, TokenERC20 {
         _;
     }
     
+    modifier requirePaymentContract {
+        require(paymentContract != address(0));
+        _;        
+    }
+    
     function () payable public {}
 
     // constructor    
-    function EtheremonToken(address _fundAddress) public {
-        require(_fundAddress != address(0));
-        totalSupply = 1000000 * 10**uint(decimals);
-        fundAddress = _fundAddress;
-        balanceOf[fundAddress] = totalSupply;
+    function EtheremonToken(address _inGameRewardAddress, address _userGrowPoolAddress, address _developerAddress, address _paymentContract) public {
+        require(_inGameRewardAddress != address(0));
+        require(_userGrowPoolAddress != address(0));
+        require(_developerAddress != address(0));
+        inGameRewardAddress = _inGameRewardAddress;
+        userGrowPoolAddress = _userGrowPoolAddress;
+        developerAddress = _developerAddress;
+
+        balanceOf[inGameRewardAddress] = 14000000 * 10**uint(decimals);
+        balanceOf[inGameRewardAddress] = 5000000 * 10**uint(decimals);
+        balanceOf[developerAddress] = 1000000 * 10**uint(decimals);
+        totalSupply = balanceOf[inGameRewardAddress] + balanceOf[inGameRewardAddress] + balanceOf[developerAddress];
+        paymentContract = _paymentContract;
+    }
+    
+    // moderators
+    function setAddress(address _inGameRewardAddress, address _userGrowPoolAddress, address _developerAddress, address _paymentContract) onlyModerators external {
+        inGameRewardAddress = _inGameRewardAddress;
+        userGrowPoolAddress = _userGrowPoolAddress;
+        developerAddress = _developerAddress;
+        paymentContract = _paymentContract;
     }
     
     // public
@@ -214,5 +246,36 @@ contract EtheremonToken is BasicAccessControl, TokenERC20 {
         require(this.balance >= amount * sellPrice);
         _transfer(msg.sender, this, amount);
         msg.sender.transfer(amount * sellPrice);
+    }
+    
+    // Etheremon 
+    function createCastle(uint _tokens, string _name, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) isActive requirePaymentContract external {
+        if (_tokens > balanceOf[msg.sender])
+            revert();
+        PaymentInterface payment = PaymentInterface(paymentContract);
+        uint deductedTokens = payment.createCastle(msg.sender, _tokens, _name, _a1, _a2, _a3, _s1, _s2, _s3);
+        if (deductedTokens == 0 || deductedTokens > _tokens)
+            revert();
+        _transfer(msg.sender, inGameRewardAddress, deductedTokens);
+    }
+    
+    function catchMonster(uint _tokens, uint32 _classId, string _name) isActive requirePaymentContract external {
+        if (_tokens > balanceOf[msg.sender])
+            revert();
+        PaymentInterface payment = PaymentInterface(paymentContract);
+        uint deductedTokens = payment.catchMonster(msg.sender, _tokens, _classId, _name);
+        if (deductedTokens == 0 || deductedTokens > _tokens)
+            revert();
+        _transfer(msg.sender, inGameRewardAddress, deductedTokens);
+    }
+    
+    function payService(uint _tokens, uint32 _type, string _text, uint64 _param1, uint64 _param2, uint64 _param3) isActive requirePaymentContract external {
+        if (_tokens > balanceOf[msg.sender])
+            revert();
+        PaymentInterface payment = PaymentInterface(paymentContract);
+        uint deductedTokens = payment.payService(msg.sender, _tokens, _type, _text, _param1, _param2, _param3);
+        if (deductedTokens == 0 || deductedTokens > _tokens)
+            revert();
+        _transfer(msg.sender, inGameRewardAddress, deductedTokens);
     }
 }
