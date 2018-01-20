@@ -199,9 +199,9 @@ contract EtheremonToken is BasicAccessControl, TokenERC20 {
         developerAddress = _developerAddress;
 
         balanceOf[inGameRewardAddress] = 14000000 * 10**uint(decimals);
-        balanceOf[inGameRewardAddress] = 5000000 * 10**uint(decimals);
+        balanceOf[userGrowPoolAddress] = 5000000 * 10**uint(decimals);
         balanceOf[developerAddress] = 1000000 * 10**uint(decimals);
-        totalSupply = balanceOf[inGameRewardAddress] + balanceOf[inGameRewardAddress] + balanceOf[developerAddress];
+        totalSupply = balanceOf[inGameRewardAddress] + balanceOf[userGrowPoolAddress] + balanceOf[developerAddress];
         paymentContract = _paymentContract;
     }
     
