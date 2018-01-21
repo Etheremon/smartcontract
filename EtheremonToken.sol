@@ -158,7 +158,7 @@ contract PaymentInterface {
 contract EtheremonToken is BasicAccessControl, TokenERC20 {
     // metadata
     string public constant name = "Etheremon";
-    string public constant symbol = "EMTH";
+    string public constant symbol = "EMON";
     uint256 public constant decimals = 8;
     string public version = "1.0";
     

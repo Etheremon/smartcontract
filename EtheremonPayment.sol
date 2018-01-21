@@ -301,6 +301,5 @@ contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
     function payService(address _trainer, uint _tokens, uint32 _type, string _text, uint64 _param1, uint64 _param2, uint64 _param3) public returns(uint) {
         if (msg.sender != tokenContract)
             revert();
-        return 0;
     }*/
 }

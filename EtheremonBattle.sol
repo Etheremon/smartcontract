@@ -250,9 +250,9 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         address castleOwner;
         uint64 battleId;
         uint32 castleId;
-        uint32 castleBrickBonus;
+        uint32[3] temp;
         uint castleIndex;
-        uint32[6] monsterExp;
+        uint8[6] monsterLevel;
         uint8[3] randoms;
         bool win;
         BattleResult result;
@@ -292,7 +292,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     mapping(uint8 => uint8) typeAdvantages;
     mapping(uint32 => CacheClassInfo) cacheClasses;
     mapping(uint8 => uint32) levelExps;
-    mapping(uint8 => uint32) levelExpGains;
     uint8 public ancestorBuffPercentage = 10;
     uint8 public gasonBuffPercentage = 10;
     uint8 public typeBuffPercentage = 20;
@@ -404,11 +403,16 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         classInfo.ancestors = ancestors;
     }
     
-    function fastSetCacheClassInfo(uint32 _classId1, uint32 _classId2, uint32 _classId3, uint32 _classId4) onlyModerators requireDataContract requireWorldContract public {
+    function fastSetCacheClassInfo(uint32 _classId1, uint32 _classId2, uint32 _classId3, uint32 _classId4, uint32 _classId5, uint32 _classId6, uint32 _classId7, uint32 _classId8) 
+        onlyModerators requireDataContract requireWorldContract public {
         setCacheClassInfo(_classId1);
         setCacheClassInfo(_classId2);
         setCacheClassInfo(_classId3);
         setCacheClassInfo(_classId4);
+        setCacheClassInfo(_classId5);
+        setCacheClassInfo(_classId6);
+        setCacheClassInfo(_classId7);
+        setCacheClassInfo(_classId8);
     }    
      
     function withdrawEther(address _sendTo, uint _amount) onlyModerators external {
@@ -423,11 +427,12 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         _sendTo.transfer(_amount);
     }
     
-    function setContract(address _dataContract, address _worldContract, address _tradeContract, address _castleContract) onlyModerators external {
+    function setContract(address _dataContract, address _worldContract, address _tradeContract, address _castleContract, address _paymentContract) onlyModerators external {
         dataContract = _dataContract;
         worldContract = _worldContract;
         tradeContract = _tradeContract;
         castleContract = _castleContract;
+        paymentContract = _paymentContract;
     }
     
     function setConfig(uint8 _ancestorBuffPercentage, uint8 _gasonBuffPercentage, uint8 _typeBuffPercentage, uint32 _castleMinBrick, 
@@ -454,16 +459,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             level += 1;
             requirement = (requirement * 11) / 10 + 5;
             sum += requirement;
-        }
-    }
-
-    function genLevelExpGain() onlyModerators external {
-        uint8 level = 1;
-        uint32 rate = 100000;
-        while (level <= 100) {
-            rate = rate * 21 / 20;
-            levelExpGains[level] = rate * 30 / 100000;
-            level += 1;
         }
     }
     
@@ -497,10 +492,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return minIndex;
     }
     
-    /*
-    function getGainExp(uint32 _exp1, uint32 _exp2, bool _win) view public returns(uint32){
-        uint8 level = getLevel(_exp2);
-        uint8 level2 = getLevel(_exp1);
+    function getGainExp(uint8 level2, uint8 level, bool _win) pure public returns(uint32){
         uint8 halfLevel1 = level;
         if (level > level2 + 3) {
             halfLevel1 = (level2 + 3) / 2;
@@ -521,21 +513,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             gainExp /= uint32(2) ** ((level2 - level) / 5);
         }
         return gainExp;
-    }*/
-    function getGainExp(uint32 _exp1, uint32 _exp2, bool _win) view public returns(uint32 gainExp){
-        uint8 level1 = getLevel(_exp1);
-        uint8 level2 = getLevel(_exp2);
-
-        if (level2 > level1 + 3)
-            gainExp = levelExpGains[level1 + 3];
-        else
-            gainExp = levelExpGains[level2];
-
-        if (!_win) gainExp /= 3;
-
-        if (level1 >= level2 + 5) {
-            gainExp /= uint32(2) ** ((level1 - level2) / 5);
-        }
     }
     
     function getMonsterLevel(uint64 _objId) constant external returns(uint32, uint8) {
@@ -589,14 +566,14 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return (obj.classId, obj.exp);
     }
     
-    function getCurrentStats(uint64 _objId) constant public returns(uint32, uint32, uint16[6]){
+    function getCurrentStats(uint64 _objId) constant public returns(uint32, uint8, uint16[6]){
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         uint16[6] memory stats;
         uint32 classId;
         uint32 exp;
         (classId, exp) = getObjExp(_objId);
         if (classId == 0)
-            return (classId, exp, stats);
+            return (classId, 0, stats);
         
         uint i = 0;
         uint8 level = getLevel(exp);
@@ -606,7 +583,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         for(i=0; i < cacheClasses[classId].steps.length; i++) {
             stats[i] += uint16(safeMult(cacheClasses[classId].steps[i], level*3));
         }
-        return (classId, exp, stats);
+        return (classId, level, stats);
     }
     
     function safeDeduct(uint16 a, uint16 b) pure private returns(uint16){
@@ -695,11 +672,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             bAttackSupport += typeBuffPercentage;
     }
     
-    function calculateBattleStats(AttackData att) constant private returns(uint32 aExp, uint16[6] aStats, uint32 bExp, uint16[6] bStats) {
+    function calculateBattleStats(AttackData att) constant private returns(uint8 aLevel, uint16[6] aStats, uint8 bLevel, uint16[6] bStats) {
         uint32 aClassId = 0;
-        (aClassId, aExp, aStats) = getCurrentStats(att.aa);
+        (aClassId, aLevel, aStats) = getCurrentStats(att.aa);
         uint32 bClassId = 0;
-        (bClassId, bExp, bStats) = getCurrentStats(att.ba);
+        (bClassId, bLevel, bStats) = getCurrentStats(att.ba);
         
         // check gasonsupport
         (att.aAttackSupport, att.bAttackSupport) = getTypeSupport(aClassId, bClassId);
@@ -723,10 +700,10 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
     }
     
-    function attack(AttackData att) constant private returns(uint32 aExp, uint32 bExp, uint8 ran, bool win) {
+    function attack(AttackData att) constant private returns(uint8 aLevel, uint8 bLevel, uint8 ran, bool win) {
         uint16[6] memory aStats;
         uint16[6] memory bStats;
-        (aExp, aStats, bExp, bStats) = calculateBattleStats(att);
+        (aLevel, aStats, bLevel, bStats) = calculateBattleStats(att);
         
         ran = getRandom(maxRandomRound+2, att.index, lastAttacker);
         uint16 round = 0;
@@ -935,7 +912,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         BattleLogData memory log;
-        (log.castleIndex, log.castleOwner, log.castleBrickBonus) = castle.getCastleBasicInfoById(_castleId);
+        (log.castleIndex, log.castleOwner, log.temp[0]) = castle.getCastleBasicInfoById(_castleId);
         if (log.castleIndex == 0 || log.castleOwner == msg.sender)
             revert();
         
@@ -953,9 +930,9 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.index = 0;
         att.aa = b.a1;
         att.ba = _aa1;
-        (log.monsterExp[0], log.monsterExp[3], log.randoms[0], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[0], log.monsterExp[3], log.win));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[3], log.monsterExp[0], !log.win));
+        (log.monsterLevel[0], log.monsterLevel[3], log.randoms[0], log.win) = attack(att);
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[0], log.monsterLevel[3], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[3], log.monsterLevel[0], !log.win));
         if (log.win)
             countWin += 1;
         
@@ -963,18 +940,18 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.index = 1;
         att.aa = b.a2;
         att.ba = _aa2;
-        (log.monsterExp[1], log.monsterExp[4], log.randoms[1], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[1], log.monsterExp[4], log.win));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[4], log.monsterExp[1], !log.win));
+        (log.monsterLevel[1], log.monsterLevel[4], log.randoms[1], log.win) = attack(att);
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[1], log.monsterLevel[4], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[4], log.monsterLevel[1], !log.win));
         if (log.win)
             countWin += 1;   
 
         att.index = 2;
         att.aa = b.a3;
         att.ba = _aa3;
-        (log.monsterExp[2], log.monsterExp[5], log.randoms[2], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterExp[2], log.monsterExp[5], log.win));
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterExp[5], log.monsterExp[2], !log.win));
+        (log.monsterLevel[2], log.monsterLevel[5], log.randoms[2], log.win) = attack(att);
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[2], log.monsterLevel[5], log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[5], log.monsterLevel[2], !log.win));
         if (log.win)
             countWin += 1; 
         
@@ -986,10 +963,16 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             log.result = BattleResult.CASTLE_LOSE;
         }
         
+        log.temp[0] = levelExps[log.monsterLevel[0]]-1;
+        log.temp[1] = levelExps[log.monsterLevel[1]]-1;
+        log.temp[2] = levelExps[log.monsterLevel[2]]-1;
         log.battleId = castle.addBattleLog(_castleId, msg.sender, log.randoms[0], log.randoms[1], log.randoms[2], 
-            uint8(log.result), log.monsterExp[0], log.monsterExp[1], log.monsterExp[2]);
+            uint8(log.result), log.temp[0], log.temp[1], log.temp[2]);
         
-        castle.addBattleLogMonsterInfo(log.battleId, _aa1, _aa2, _aa3, _as1, _as2, _as3, log.monsterExp[3], log.monsterExp[4], log.monsterExp[5]);
+        log.temp[0] = levelExps[log.monsterLevel[3]]-1;
+        log.temp[1] = levelExps[log.monsterLevel[4]]-1;
+        log.temp[2] = levelExps[log.monsterLevel[5]]-1;
+        castle.addBattleLogMonsterInfo(log.battleId, _aa1, _aa2, _aa3, _as1, _as2, _as3, log.temp[0], log.temp[1], log.temp[2]);
     
         EventAttackCastle(msg.sender, _castleId, uint8(log.result));
     }
