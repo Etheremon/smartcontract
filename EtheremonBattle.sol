@@ -775,7 +775,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return true;
     }
     
-    function createCatleInternal(CastleData _castleData) private {
+    function createCastleInternal(CastleData _castleData) private {
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 castleId;
         uint castleIndex = 0;
@@ -819,7 +819,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castleData.s1 = _s1;
         castleData.s2 = _s2;
         castleData.s3 = _s3;
-        createCatleInternal(castleData);
+        createCastleInternal(castleData);
         totalEarn += msg.value;
     }
     
@@ -851,7 +851,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         castleData.s1 = _s1;
         castleData.s2 = _s2;
         castleData.s3 = _s3;
-        createCatleInternal(castleData);
+        createCastleInternal(castleData);
     }
     
     function renameCastle(uint32 _castleId, string _name) isActive requireCastleContract external {
