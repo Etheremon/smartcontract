@@ -299,7 +299,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint16 public maxActiveCastle = 30;
     uint8 public maxRandomRound = 4;
     
-    uint8 public winBrickReturn = 8;
     uint32 public castleMinBrick = 5;
     uint8 public castleExpAdjustment = 100; // percentage
     uint public brickETHPrice = 0.004 ether;
@@ -743,11 +742,6 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
                  payment.giveBattleBonus(_castleOwner, winTokenReward);
             }
         } else {
-            if (totalWin/winBrickReturn > brickNumber) {
-                brickNumber = 2 * brickNumber;
-            } else {
-                brickNumber += totalWin/winBrickReturn;
-            }
             if (brickNumber <= totalLose + 1) {
                 castle.removeCastleFromActive(_castleId);
                 // destroy
