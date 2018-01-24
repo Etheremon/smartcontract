@@ -301,8 +301,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     
     uint8 public winBrickReturn = 8;
     uint32 public castleMinBrick = 5;
-    uint public brickPrice = 2 * 10 ** 8;
-    uint public tokenPrice = 0.004 ether / 10 ** 8;
+    uint8 public castleExpAdjustment = 100; // percentage
+    uint public brickETHPrice = 0.004 ether;
     uint8 public minHpDeducted = 10;
     uint public winTokenReward = 10 ** 8;
     
@@ -436,7 +436,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     }
     
     function setConfig(uint8 _ancestorBuffPercentage, uint8 _gasonBuffPercentage, uint8 _typeBuffPercentage, uint32 _castleMinBrick, 
-        uint8 _maxLevel, uint16 _maxActiveCastle, uint8 _maxRandomRound, uint8 _minHpDeducted, uint _winTokenReward, uint _tokenPrice, uint _brickPrice) onlyModerators external{
+        uint8 _maxLevel, uint16 _maxActiveCastle, uint8 _maxRandomRound, uint8 _minHpDeducted, uint _winTokenReward, uint _brickETHPrice, uint8 _castleExpAdjustment) onlyModerators external{
         ancestorBuffPercentage = _ancestorBuffPercentage;
         gasonBuffPercentage = _gasonBuffPercentage;
         typeBuffPercentage = _typeBuffPercentage;
@@ -446,8 +446,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         maxRandomRound = _maxRandomRound;
         minHpDeducted = _minHpDeducted;
         winTokenReward = _winTokenReward;
-        tokenPrice = _tokenPrice;
-        brickPrice = _brickPrice;
+        brickETHPrice = _brickETHPrice;
+        castleExpAdjustment = _castleExpAdjustment;
     }
     
     function genLevelExp() onlyModerators external {
@@ -729,26 +729,31 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         win = aStats[0] >= bStats[0];
     }
     
-    function destroyCastle(uint32 _castleId, bool win) requireCastleContract private{
-        // if castle win, ignore
-        if (win)
-            return;
+    function updateCastle(uint32 _castleId, address _castleOwner, bool win) requireCastleContract private{
         EtheremonCastleContract castle = EtheremonCastleContract(castleContract);
         uint32 totalWin;
         uint32 totalLose;
         uint32 brickNumber;
         (totalWin, totalLose, brickNumber) = castle.getCastleWinLose(_castleId);
         EtheremonPaymentInterface payment = EtheremonPaymentInterface(paymentContract);
-        if (totalWin/winBrickReturn > brickNumber) {
-            brickNumber = 2 * brickNumber;
+        
+        // if castle win, ignore
+        if (win) {
+            if (totalWin < brickNumber) {
+                 payment.giveBattleBonus(_castleOwner, winTokenReward);
+            }
         } else {
-            brickNumber += totalWin/winBrickReturn;
+            if (totalWin/winBrickReturn > brickNumber) {
+                brickNumber = 2 * brickNumber;
+            } else {
+                brickNumber += totalWin/winBrickReturn;
+            }
+            if (brickNumber <= totalLose + 1) {
+                castle.removeCastleFromActive(_castleId);
+                // destroy
+            }
+            payment.giveBattleBonus(msg.sender, winTokenReward);
         }
-        if (brickNumber <= totalLose + 1) {
-            castle.removeCastleFromActive(_castleId);
-            // destroy
-        }
-        payment.giveBattleBonus(msg.sender, winTokenReward);
     }
     
     function hasValidParam(address _trainer, uint64 _a1, uint64 _a2, uint64 _a3, uint64 _s1, uint64 _s2, uint64 _s3) constant public returns(bool) {
@@ -805,7 +810,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             trade.isOnTrading(_s1) || trade.isOnTrading(_s2) || trade.isOnTrading(_s3))
             revert();
         
-        uint32 numberBrick = uint32((msg.value / tokenPrice) / brickPrice);
+        uint32 numberBrick = uint32(msg.value / brickETHPrice);
         if (numberBrick < castleMinBrick) {
             revert();
         }
@@ -931,7 +936,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a1;
         att.ba = _aa1;
         (log.monsterLevel[0], log.monsterLevel[3], log.randoms[0], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[0], log.monsterLevel[3], log.win));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[0], log.monsterLevel[3], log.win)*castleExpAdjustment/100);
         gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[3], log.monsterLevel[0], !log.win));
         if (log.win)
             countWin += 1;
@@ -941,7 +946,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a2;
         att.ba = _aa2;
         (log.monsterLevel[1], log.monsterLevel[4], log.randoms[1], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[1], log.monsterLevel[4], log.win));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[1], log.monsterLevel[4], log.win)*castleExpAdjustment/100);
         gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[4], log.monsterLevel[1], !log.win));
         if (log.win)
             countWin += 1;   
@@ -950,13 +955,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.aa = b.a3;
         att.ba = _aa3;
         (log.monsterLevel[2], log.monsterLevel[5], log.randoms[2], log.win) = attack(att);
-        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[2], log.monsterLevel[5], log.win));
+        gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[2], log.monsterLevel[5], log.win)*castleExpAdjustment/100);
         gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[5], log.monsterLevel[2], !log.win));
         if (log.win)
             countWin += 1; 
         
         
-        destroyCastle(_castleId, countWin>1);
+        updateCastle(_castleId, log.castleOwner, countWin>1);
         if (countWin>1) {
             log.result = BattleResult.CASTLE_WIN;
         } else {
