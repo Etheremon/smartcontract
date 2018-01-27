@@ -299,8 +299,10 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint16 public maxActiveCastle = 30;
     uint8 public maxRandomRound = 4;
     
+    uint8 public winBrickReturn = 8;
     uint32 public castleMinBrick = 5;
-    uint8 public castleExpAdjustment = 100; // percentage
+    uint8 public castleExpAdjustment = 150; // percentage
+    uint8 public castleMaxLevelGap = 5;
     uint public brickETHPrice = 0.004 ether;
     uint8 public minHpDeducted = 10;
     uint public winTokenReward = 10 ** 8;
@@ -434,19 +436,23 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         paymentContract = _paymentContract;
     }
     
-    function setConfig(uint8 _ancestorBuffPercentage, uint8 _gasonBuffPercentage, uint8 _typeBuffPercentage, uint32 _castleMinBrick, 
-        uint8 _maxLevel, uint16 _maxActiveCastle, uint8 _maxRandomRound, uint8 _minHpDeducted, uint _winTokenReward, uint _brickETHPrice, uint8 _castleExpAdjustment) onlyModerators external{
+    function setConfig(uint8 _ancestorBuffPercentage, uint8 _gasonBuffPercentage, uint8 _typeBuffPercentage, 
+        uint8 _maxLevel, uint8 _maxRandomRound, uint8 _minHpDeducted, uint _winTokenReward) onlyModerators external{
         ancestorBuffPercentage = _ancestorBuffPercentage;
         gasonBuffPercentage = _gasonBuffPercentage;
         typeBuffPercentage = _typeBuffPercentage;
-        castleMinBrick = _castleMinBrick;
         maxLevel = _maxLevel;
-        maxActiveCastle = _maxActiveCastle;
         maxRandomRound = _maxRandomRound;
         minHpDeducted = _minHpDeducted;
         winTokenReward = _winTokenReward;
+    }
+    
+    function setCastleConfig(uint8 _castleMaxLevelGap, uint16 _maxActiveCastle, uint _brickETHPrice, uint8 _castleExpAdjustment, uint32 _castleMinBrick) onlyModerators external {
+        castleMaxLevelGap = _castleMaxLevelGap;
+        maxActiveCastle = _maxActiveCastle;
         brickETHPrice = _brickETHPrice;
         castleExpAdjustment = _castleExpAdjustment;
+        castleMinBrick = _castleMinBrick;
     }
     
     function genLevelExp() onlyModerators external {
@@ -742,6 +748,11 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
                  payment.giveBattleBonus(_castleOwner, winTokenReward);
             }
         } else {
+            if (totalWin/winBrickReturn > brickNumber) {
+                brickNumber = 2 * brickNumber;
+            } else {
+                brickNumber += totalWin/winBrickReturn;
+            }
             if (brickNumber <= totalLose + 1) {
                 castle.removeCastleFromActive(_castleId);
                 // destroy
@@ -954,6 +965,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         if (log.win)
             countWin += 1; 
         
+        if ((log.monsterLevel[0] + log.monsterLevel[1] + log.monsterLevel[2])/3 + castleMaxLevelGap < (log.monsterLevel[3] + log.monsterLevel[4] + log.monsterLevel[5])/3)
+            revert();
         
         updateCastle(_castleId, log.castleOwner, countWin>1);
         if (countWin>1) {
