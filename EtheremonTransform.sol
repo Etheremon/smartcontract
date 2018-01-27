@@ -335,6 +335,17 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
     }    
     
+    function removeHatchingTimeWithToken(address _trainer) isActive onlyModerators requireDataContract requireTransformDataContract external {
+        EtheremonTransformData transformData = EtheremonTransformData(transformDataContract);
+        MonsterEgg memory egg;
+        (egg.eggId, egg.objId, egg.classId, egg.trainer, egg.hatchTime, egg.newObjId) = transformData.getHatchingEggData(_trainer);
+        // not hatching any egg
+        if (egg.eggId == 0 || egg.trainer != _trainer || egg.newObjId > 0)
+            revert();
+        
+        transformData.setHatchTime(egg.eggId, 0);
+    }    
+    
     // public
 
     function ceil(uint a, uint m) pure public returns (uint) {
@@ -508,6 +519,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         }
         transformData.setHatchTime(egg.eggId, 0);
     }
+
     
     function checkAncestors(uint32 _classId, address _trainer, uint64 _a1, uint64 _a2, uint64 _a3) constant public returns(bool) {
         EtheremonWorld world = EtheremonWorld(worldContract);
