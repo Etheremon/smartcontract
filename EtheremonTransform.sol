@@ -164,6 +164,7 @@ contract EtheremonWorld is EtheremonEnum {
     function getTrainerEarn(address _trainer) constant public returns(uint256);
     function getReturnFromMonster(uint64 _objId) constant public returns(uint256 current, uint256 total);
     function getClassPropertyValue(uint32 _classId, PropertyType _type, uint index) constant external returns(uint32);
+    function getClassPropertySize(uint32 _classId, PropertyType _type) constant external returns(uint);
 }
 
 interface EtheremonBattle {
@@ -452,14 +453,14 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         return minIndex;
     }
 
-    function getGen0ObjInfo(uint64 _objId) constant public returns(uint32 classId, uint32 createIndex, uint256 totalEarn) {
+    function getGen0ObjInfo(uint64 _objId) constant public returns(uint32, uint32, uint256) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         
         MonsterObjAcc memory obj;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
         
-        Gen0Config memory gen0 = gen0Config[classId];
-        if (gen0.classId != classId) {
+        Gen0Config memory gen0 = gen0Config[obj.classId];
+        if (gen0.classId != obj.classId) {
             return (gen0.classId, obj.createIndex, 0);
         }
         
@@ -607,7 +608,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         // check ancestor
         uint32[3] memory ancestors;
         uint32[3] memory requestAncestors;
-        for (index = 0; index < 3; index++) {
+        index = world.getClassPropertySize(_classId, PropertyType.ANCESTOR);
+        while (index > 0) {
+            index -= 1;
             ancestors[index] = world.getClassPropertyValue(_classId, PropertyType.ANCESTOR, index);
         }
             
@@ -635,8 +638,6 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         if (requestAncestors[1] > 0 && (requestAncestors[1] == requestAncestors[2]))
             return false;
                 
-        if (requestAncestors.length != ancestors.length)
-            return false;
         for (index = 0; index < ancestors.length; index++) {
             temp = ancestors[index];
             if (temp > 0 && temp != requestAncestors[0]  && temp != requestAncestors[1] && temp != requestAncestors[2])
