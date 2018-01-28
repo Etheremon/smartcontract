@@ -159,12 +159,19 @@ contract BattleInterface {
 
 contract TransformInterface {
     function removeHatchingTimeWithToken(address _trainer) external;
+    function buyEggWithToken(address _trainer) external;
 }
 
 contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 constant public STAT_COUNT = 6;
     uint8 constant public STAT_MAX = 32;
     uint8 constant public GEN0_NO = 24;
+    
+    enum PayServiceType {
+        NONE,
+        FAST_HATCHING,
+        RANDOM_EGG
+    }
     
     struct MonsterClassAcc {
         uint32 classId;
@@ -196,6 +203,7 @@ contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
     // config
     uint public brickPrice = 3 * 10 ** 8; // 3 tokens
     uint public fastHatchingPrice = 35 * 10 ** 8; // 15 tokens 
+    uint public buyEggPrice = 50 * 10 ** 8; // 50 tokens
     uint public tokenPrice = 0.004 ether / 10 ** 8;
     uint public maxDexSize = 500;
     uint public latestValue = 0;
@@ -256,11 +264,12 @@ contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
         transformContract = _transformContract;
     }
     
-    function setConfig(uint _brickPrice, uint _tokenPrice, uint _maxDexSize, uint _fastHatchingPrice) onlyModerators external {
+    function setConfig(uint _brickPrice, uint _tokenPrice, uint _maxDexSize, uint _fastHatchingPrice, uint _buyEggPrice) onlyModerators external {
         brickPrice = _brickPrice;
         tokenPrice = _tokenPrice;
         maxDexSize = _maxDexSize;
         fastHatchingPrice = _fastHatchingPrice;
+        buyEggPrice = _buyEggPrice;
     }
     
     // battle
@@ -317,14 +326,20 @@ contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
         if (msg.sender != tokenContract)
             revert();
         
-        if (_type == 1) {
+        TransformInterface transform = TransformInterface(transformContract);
+        if (_type == uint32(PayServiceType.FAST_HATCHING)) {
             // remove hatching time 
             if (_tokens < fastHatchingPrice)
                 revert();
-            TransformInterface transform = TransformInterface(transformContract);
             transform.removeHatchingTimeWithToken(_trainer);
             
             return fastHatchingPrice;
+        } else if (_type == uint32(PayServiceType.RANDOM_EGG)) {
+            if (_tokens < buyEggPrice)
+                revert();
+            transform.buyEggWithToken(_trainer);
+
+            return buyEggPrice;
         } else {
             revert();
         }

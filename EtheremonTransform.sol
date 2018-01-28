@@ -218,6 +218,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     uint16 public hatchStartTime = 2; // hour
     uint16 public hatchMaxTime = 46; // hour
     uint public removeHatchingTimeFee = 0.05 ether; // ETH
+    uint public buyEggFee = 0.06 ether; // ETH
+    
+    uint32[] public randomClassIds;
     mapping(uint32 => uint8) public layingEggLevels;
     mapping(uint32 => uint8) public layingEggDeductions;
     mapping(uint32 => uint8) public transformLevels;
@@ -319,8 +322,9 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         transformClasses[_classId] = _tranformClass;
     }
     
-    function setConfig(uint _removeHatchingTimeFee) onlyModerators external {
+    function setConfig(uint _removeHatchingTimeFee, uint _buyEggFee) onlyModerators external {
         removeHatchingTimeFee = _removeHatchingTimeFee;
+        buyEggFee = _buyEggFee;
     }
 
     function genLevelExp() onlyModerators external {
@@ -333,7 +337,32 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             requirement = (requirement * 11) / 10 + 5;
             sum += requirement;
         }
-    }    
+    }
+    
+    function addRandomClass(uint32 _newClassId) onlyModerators public {
+        if (_newClassId > 0) {
+            for (uint index = 0; index < randomClassIds.length; index++) {
+                if (randomClassIds[index] == _newClassId) {
+                    return;
+                }
+            }
+            randomClassIds.push(_newClassId);
+        }
+    }
+    
+    function removeRandomClass(uint32 _oldClassId) onlyModerators public {
+        uint foundIndex = 0;
+        for (; foundIndex < randomClassIds.length; foundIndex++) {
+            if (randomClassIds[foundIndex] == _oldClassId) {
+                break;
+            }
+        }
+        if (foundIndex < randomClassIds.length) {
+            randomClassIds[foundIndex] = randomClassIds[randomClassIds.length-1];
+            delete randomClassIds[randomClassIds.length-1];
+            randomClassIds.length--;
+        }
+    }
     
     function removeHatchingTimeWithToken(address _trainer) isActive onlyModerators requireDataContract requireTransformDataContract external {
         EtheremonTransformData transformData = EtheremonTransformData(transformDataContract);
@@ -345,6 +374,24 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         
         transformData.setHatchTime(egg.eggId, 0);
     }    
+    
+    function buyEggWithToken(address _trainer) isActive onlyModerators requireDataContract requireTransformDataContract external {
+        if (randomClassIds.length == 0) {
+            revert();
+        }
+        
+        EtheremonTransformData transformData = EtheremonTransformData(transformDataContract);
+        // make sure no hatching egg at the same time
+        if (transformData.getHatchingEggId(_trainer) > 0) {
+            revert();
+        }
+
+        // add random egg
+        uint8 classIndex = getRandom(uint16(randomClassIds.length), 1, lastHatchingAddress);
+        uint64 eggId = transformData.addEgg(0, randomClassIds[classIndex], _trainer, block.timestamp + (hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress)) * 3600);
+        // deduct exp
+        EventLayEgg(msg.sender, 0, eggId);
+    }
     
     // public
 
@@ -605,6 +652,28 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         data.removeMonsterIdMapping(msg.sender, _objId);
         transformData.setTranformed(_objId, newObjId);
         EventTransform(msg.sender, _objId, newObjId);
+    }
+    
+    function buyEgg() isActive requireDataContract requireTransformDataContract external payable {
+        if (msg.value != buyEggFee) {
+            revert();
+        }
+        
+        if (randomClassIds.length == 0) {
+            revert();
+        }
+        
+        EtheremonTransformData transformData = EtheremonTransformData(transformDataContract);
+        // make sure no hatching egg at the same time
+        if (transformData.getHatchingEggId(msg.sender) > 0) {
+            revert();
+        }
+
+        // add random egg
+        uint8 classIndex = getRandom(uint16(randomClassIds.length), 1, lastHatchingAddress);
+        uint64 eggId = transformData.addEgg(0, randomClassIds[classIndex], msg.sender, block.timestamp + (hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress)) * 3600);
+        // deduct exp
+        EventLayEgg(msg.sender, 0, eggId);
     }
     
     // read

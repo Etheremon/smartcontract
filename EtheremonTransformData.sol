@@ -140,7 +140,9 @@ contract EtheremonTransformData is EtheremonEnum, BasicAccessControl, SafeMath {
         hatchingEggs[_trainer] = totalEgg;
         
         // increase count
-        eggList[_objId].push(totalEgg);
+        if (_objId > 0) {
+            eggList[_objId].push(totalEgg);
+        }
         return totalEgg;
     }
     
