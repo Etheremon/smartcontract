@@ -562,7 +562,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64 eggId = transformData.addEgg(obj.monsterId, obj.classId, msg.sender, block.timestamp + (hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress)) * 3600);
         
         // deduct exp 
-        data.decreaseMonsterExp(_objId, obj.exp - levelExps[afterLevel-1]);
+        if (afterLevel < currentLevel)
+            data.decreaseMonsterExp(_objId, obj.exp - levelExps[afterLevel-1]);
         EventLayEgg(msg.sender, _objId, eggId);
     }
     
