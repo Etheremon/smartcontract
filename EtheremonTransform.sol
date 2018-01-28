@@ -214,6 +214,14 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         uint8 level;
     }
     
+    // Gen0 has return price & no longer can be caught when this contract is deployed
+    struct Gen0Config {
+        uint32 classId;
+        uint256 originalPrice;
+        uint256 returnPrice;
+        uint32 total; // total caught (not count those from eggs)
+    }
+    
     // hatching range
     uint16 public hatchStartTime = 2; // hour
     uint16 public hatchMaxTime = 46; // hour
@@ -228,6 +236,8 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
 
     mapping(uint8 => uint32) public levelExps;
     address private lastHatchingAddress;
+    
+    mapping(uint32 => Gen0Config) public gen0Config;
     
     // linked smart contract
     address public dataContract;
@@ -301,7 +311,34 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         battleContract = _battleContract;
         tradeContract = _tradeContract;
     }
-    
+
+    function setOriginalPriceGen0() onlyModerators external {
+        gen0Config[1] = Gen0Config(1, 0.3 ether, 0.003 ether, 374);
+        gen0Config[2] = Gen0Config(2, 0.3 ether, 0.003 ether, 408);
+        gen0Config[3] = Gen0Config(3, 0.3 ether, 0.003 ether, 373);
+        gen0Config[4] = Gen0Config(4, 0.2 ether, 0.002 ether, 437);
+        gen0Config[5] = Gen0Config(5, 0.1 ether, 0.001 ether, 497);
+        gen0Config[6] = Gen0Config(6, 0.3 ether, 0.003 ether, 380); 
+        gen0Config[7] = Gen0Config(7, 0.2 ether, 0.002 ether, 345);
+        gen0Config[8] = Gen0Config(8, 0.1 ether, 0.001 ether, 518); 
+        gen0Config[9] = Gen0Config(9, 0.1 ether, 0.001 ether, 447);
+        gen0Config[10] = Gen0Config(10, 0.2 ether, 0.002 ether, 380); 
+        gen0Config[11] = Gen0Config(11, 0.2 ether, 0.002 ether, 354);
+        gen0Config[12] = Gen0Config(12, 0.2 ether, 0.002 ether, 346);
+        gen0Config[13] = Gen0Config(13, 0.2 ether, 0.002 ether, 351); 
+        gen0Config[14] = Gen0Config(14, 0.2 ether, 0.002 ether, 338);
+        gen0Config[15] = Gen0Config(15, 0.2 ether, 0.002 ether, 341);
+        gen0Config[16] = Gen0Config(16, 0.35 ether, 0.0035 ether, 384);
+        gen0Config[17] = Gen0Config(17, 1 ether, 0.01 ether, 305); 
+        gen0Config[18] = Gen0Config(18, 0.1 ether, 0.001 ether, 427);
+        gen0Config[19] = Gen0Config(19, 1 ether, 0.01 ether, 304);
+        gen0Config[20] = Gen0Config(20, 0.4 ether, 0.05 ether, 82);
+        gen0Config[21] = Gen0Config(21, 1, 1, 123);
+        gen0Config[22] = Gen0Config(22, 0.2 ether, 0.001 ether, 468);
+        gen0Config[23] = Gen0Config(23, 0.5 ether, 0.0025 ether, 302);
+        gen0Config[24] = Gen0Config(24, 1 ether, 0.005 ether, 195);
+    }    
+
     function updateHatchingRange(uint16 _start, uint16 _max) onlyModerators external {
         hatchStartTime = _start;
         hatchMaxTime = _max;
@@ -415,17 +452,22 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         return minIndex;
     }
 
-    function getObjInfo(uint64 _objId) constant public returns(uint32 classId, uint32 createIndex, uint256 totalEarn) {
+    function getGen0ObjInfo(uint64 _objId) constant public returns(uint32 classId, uint32 createIndex, uint256 totalEarn) {
         EtheremonDataBase data = EtheremonDataBase(dataContract);
-        EtheremonWorld world = EtheremonWorld(worldContract);
-        
-        uint256 current = 0;
-        uint256 total = 0;
-        (current, total) = world.getReturnFromMonster(_objId);
         
         MonsterObjAcc memory obj;
         (obj.monsterId, obj.classId, obj.trainer, obj.exp, obj.createIndex, obj.lastClaimIndex, obj.createTime) = data.getMonsterObj(_objId);
-        return (obj.classId, obj.createIndex, total);
+        
+        Gen0Config memory gen0 = gen0Config[classId];
+        if (gen0.classId != classId) {
+            return (gen0.classId, obj.createIndex, 0);
+        }
+        
+        uint32 totalGap = 0;
+        if (obj.createIndex < gen0.total)
+            totalGap = gen0.total - obj.createIndex;
+        
+        return (obj.classId, obj.createIndex, safeMult(totalGap, gen0.returnPrice));
     }
     
     function getObjClassId(uint64 _objId) requireDataContract constant public returns(uint32, address, uint8) {
@@ -447,38 +489,28 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
     }
 
     function calculateMaxEggG0(uint64 _objId) constant public returns(uint) {
-        EtheremonDataBase data = EtheremonDataBase(dataContract);
-        EtheremonWorld world = EtheremonWorld(worldContract);
-        
         uint32 classId;
         uint32 createIndex; 
         uint256 totalEarn;
-        uint256 oPrice = 0;
-        uint32 oTotal = 0;
-        (classId, createIndex, totalEarn) = getObjInfo(_objId);
-        (classId, oPrice, oTotal) = world.getGen0COnfig(classId);
+        (classId, createIndex, totalEarn) = getGen0ObjInfo(_objId);
+        if (classId > GEN0_NO || classId == 20 || classId == 21)
+            return 0;
         
+        Gen0Config memory config = gen0Config[classId];
         // the one from egg can not lay
-        if (createIndex > oTotal)
-            return 0;
-        if (classId == 20 || classId == 21)
-            return 0;
-        
-        MonsterClassAcc memory class;
-        (class.classId, class.price, class.returnPrice, class.total, class.catchable) = data.getMonsterClass(classId);
-        if (classId > GEN0_NO || class.returnPrice == 0)
+        if (createIndex > config.total)
             return 0;
 
         // calculate agv price
-        uint256 avgPrice = oPrice;
-        uint rate = oPrice/class.returnPrice;
-        if (oTotal > rate) {
-            uint k = oTotal - rate;
-            avgPrice = (oTotal * oPrice + class.returnPrice * k * (k+1) / 2) / oTotal;
+        uint256 avgPrice = config.originalPrice;
+        uint rate = config.originalPrice/config.returnPrice;
+        if (config.total > rate) {
+            uint k = config.total - rate;
+            avgPrice = (config.total * config.originalPrice + config.returnPrice * k * (k+1) / 2) / config.total;
         }
-        uint256 catchPrice = oPrice;            
+        uint256 catchPrice = config.originalPrice;            
         if (createIndex > rate) {
-            catchPrice += class.returnPrice * safeSubtract(createIndex, rate);
+            catchPrice += config.returnPrice * safeSubtract(createIndex, rate);
         }
         if (totalEarn >= catchPrice) {
             return 0;
@@ -521,7 +553,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         uint8 afterLevel = 0;
         if (!canLayEgg(_objId, obj.classId, currentLevel))
             revert();
-        if (layingEggDeductions[obj.classId] > currentLevel)
+        if (layingEggDeductions[obj.classId] >= currentLevel)
             revert();
         afterLevel = currentLevel - layingEggDeductions[obj.classId];
 
@@ -529,7 +561,7 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
         uint64 eggId = transformData.addEgg(obj.monsterId, obj.classId, msg.sender, block.timestamp + (hatchStartTime + getRandom(hatchMaxTime, 0, lastHatchingAddress)) * 3600);
         
         // deduct exp 
-        data.decreaseMonsterExp(_objId, levelExps[currentLevel] - levelExps[afterLevel]);
+        data.decreaseMonsterExp(_objId, obj.exp - levelExps[afterLevel-1]);
         EventLayEgg(msg.sender, _objId, eggId);
     }
     
