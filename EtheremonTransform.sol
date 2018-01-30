@@ -540,6 +540,11 @@ contract EtheremonTransform is EtheremonEnum, BasicAccessControl, SafeMath {
             revert();
         }
         
+        // can not lay egg when trading
+        EtheremonTradeInterface trade = EtheremonTradeInterface(tradeContract);
+        if (trade.isOnTrading(_objId))
+            revert();
+        
         // check obj 
         EtheremonDataBase data = EtheremonDataBase(dataContract);
         MonsterObjAcc memory obj;
