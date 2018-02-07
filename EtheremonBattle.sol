@@ -302,6 +302,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
     uint8 public winBrickReturn = 8;
     uint32 public castleMinBrick = 5;
     uint8 public castleExpAdjustment = 150; // percentage
+    uint8 public attackerExpAdjustment = 50; // percentage
+    uint8 public levelExpAdjustment = 3; // level
     uint8 public castleMaxLevelGap = 5;
     uint public brickETHPrice = 0.004 ether;
     uint8 public minHpDeducted = 10;
@@ -447,11 +449,13 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         winTokenReward = _winTokenReward;
     }
     
-    function setCastleConfig(uint8 _castleMaxLevelGap, uint16 _maxActiveCastle, uint _brickETHPrice, uint8 _castleExpAdjustment, uint32 _castleMinBrick) onlyModerators external {
+    function setCastleConfig(uint8 _castleMaxLevelGap, uint16 _maxActiveCastle, uint _brickETHPrice, uint8 _castleExpAdjustment, uint8 _attackerExpAdjustment, uint8 _levelExpAdjustment, uint32 _castleMinBrick) onlyModerators external {
         castleMaxLevelGap = _castleMaxLevelGap;
         maxActiveCastle = _maxActiveCastle;
         brickETHPrice = _brickETHPrice;
         castleExpAdjustment = _castleExpAdjustment;
+        attackerExpAdjustment = _attackerExpAdjustment;
+        levelExpAdjustment = _levelExpAdjustment;
         castleMinBrick = _castleMinBrick;
     }
     
@@ -497,7 +501,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         return minIndex;
     }
     
-    function getGainExp(uint8 level2, uint8 level, bool _win) pure public returns(uint32){
+    function getGainExp(uint8 level2, uint8 level, bool _win) constant public returns(uint32){
         uint8 halfLevel1 = level;
         if (level > level2 + 3) {
             halfLevel1 = (level2 + 3) / 2;
@@ -514,8 +518,8 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
             gainExp = uint32(10 * rate / 1000000);
         }
         
-        if (level2 >= level + 5) {
-            gainExp /= uint32(2) ** ((level2 - level) / 5);
+        if (level2 >= level + levelExpAdjustment) {
+            gainExp /= uint32(2) ** ((level2 - level) / levelExpAdjustment);
         }
         return gainExp;
     }
@@ -942,7 +946,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.ba = _aa1;
         (log.monsterLevel[0], log.monsterLevel[3], log.randoms[0], log.win) = attack(att);
         gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[0], log.monsterLevel[3], log.win)*castleExpAdjustment/100);
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[3], log.monsterLevel[0], !log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[3], log.monsterLevel[0], !log.win)*attackerExpAdjustment/100);
         if (log.win)
             countWin += 1;
         
@@ -952,7 +956,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.ba = _aa2;
         (log.monsterLevel[1], log.monsterLevel[4], log.randoms[1], log.win) = attack(att);
         gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[1], log.monsterLevel[4], log.win)*castleExpAdjustment/100);
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[4], log.monsterLevel[1], !log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[4], log.monsterLevel[1], !log.win)*attackerExpAdjustment/100);
         if (log.win)
             countWin += 1;   
 
@@ -961,7 +965,7 @@ contract EtheremonBattle is EtheremonEnum, BasicAccessControl, SafeMath {
         att.ba = _aa3;
         (log.monsterLevel[2], log.monsterLevel[5], log.randoms[2], log.win) = attack(att);
         gateway.increaseMonsterExp(att.aa, getGainExp(log.monsterLevel[2], log.monsterLevel[5], log.win)*castleExpAdjustment/100);
-        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[5], log.monsterLevel[2], !log.win));
+        gateway.increaseMonsterExp(att.ba, getGainExp(log.monsterLevel[5], log.monsterLevel[2], !log.win)*attackerExpAdjustment/100);
         if (log.win)
             countWin += 1; 
         
