@@ -205,7 +205,7 @@ contract EtheremonPayment is EtheremonEnum, BasicAccessControl, SafeMath {
     uint public fastHatchingPrice = 35 * 10 ** 8; // 15 tokens 
     uint public buyEggPrice = 50 * 10 ** 8; // 50 tokens
     uint public tokenPrice = 0.004 ether / 10 ** 8;
-    uint public maxDexSize = 500;
+    uint public maxDexSize = 200;
     uint public latestValue = 0;
     
     // event
